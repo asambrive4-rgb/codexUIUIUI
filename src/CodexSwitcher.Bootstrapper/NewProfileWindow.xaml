@@ -1,0 +1,62 @@
+<Window x:Class="CodexSwitcher.Bootstrapper.NewProfileWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="새 프로필 추가"
+        Width="460"
+        Height="330"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock FontSize="22"
+                   FontWeight="SemiBold"
+                   Text="새 프로필 추가" />
+        <StackPanel Grid.Row="1"
+                    Margin="0,20,0,0">
+            <TextBlock Text="프로필 이름" />
+            <TextBox x:Name="ProfileNameTextBox"
+                     Margin="0,6,0,0"
+                     MinHeight="32"
+                     MaxLength="80"
+                     VerticalContentAlignment="Center" />
+        </StackPanel>
+        <Border Grid.Row="2"
+                Margin="0,18,0,0"
+                Padding="14"
+                Background="#FFF3F3F5"
+                CornerRadius="8">
+            <TextBlock x:Name="StatusTextBlock"
+                       TextWrapping="Wrap"
+                       Text="이메일이나 비밀번호는 이 앱에 입력하지 않습니다. Codex의 기존 로그인 화면을 사용합니다." />
+        </Border>
+        <StackPanel Grid.Row="3"
+                    Margin="0,20,0,0"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <Button x:Name="CancelButton"
+                    MinWidth="82"
+                    Padding="12,7"
+                    Click="Cancel_Click"
+                    Content="취소" />
+            <Button x:Name="StartButton"
+                    Margin="8,0,0,0"
+                    MinWidth="120"
+                    Padding="12,7"
+                    Click="Start_Click"
+                    Content="생성 및 로그인" />
+            <Button x:Name="CompleteButton"
+                    Margin="8,0,0,0"
+                    MinWidth="110"
+                    Padding="12,7"
+                    Click="Complete_Click"
+                    Content="로그인 완료"
+                    Visibility="Collapsed" />
+        </StackPanel>
+    </Grid>
+</Window>

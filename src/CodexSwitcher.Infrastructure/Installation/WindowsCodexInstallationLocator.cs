@@ -16,7 +16,6 @@ public sealed class WindowsCodexInstallationLocator : ICodexInstallationLocator
             Select-Object -First 1
 
         if ($null -eq $package) {
-            [Console]::Out.Write('False')
             exit 0
         }
 
@@ -26,15 +25,21 @@ public sealed class WindowsCodexInstallationLocator : ICodexInstallationLocator
             } |
             Select-Object -First 1
 
-        [Console]::Out.Write(
-            [string](
-                $null -ne $app -and
-                $app.AppID -like 'OpenAI.Codex_*!App'
-            )
-        )
+        if (
+            $null -ne $app -and
+            $app.AppID -like 'OpenAI.Codex_*!App'
+        ) {
+            [Console]::Out.Write($app.AppID)
+        }
         """;
 
     public async Task<bool> IsInstalledAsync(CancellationToken cancellationToken)
+    {
+        return await FindAppUserModelIdAsync(cancellationToken) is not null;
+    }
+
+    public async Task<string?> FindAppUserModelIdAsync(
+        CancellationToken cancellationToken)
     {
         var powershellPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.System),
@@ -44,7 +49,7 @@ public sealed class WindowsCodexInstallationLocator : ICodexInstallationLocator
 
         if (!File.Exists(powershellPath))
         {
-            return false;
+            return null;
         }
 
         var encodedCommand = Convert.ToBase64String(
@@ -92,8 +97,10 @@ public sealed class WindowsCodexInstallationLocator : ICodexInstallationLocator
                     "Codex 설치 확인 프로세스가 실패했습니다.");
             }
 
-            return bool.TryParse(output.Trim(), out var isInstalled) &&
-                   isInstalled;
+            var appUserModelId = output.Trim();
+            return appUserModelId.Length == 0
+                ? null
+                : appUserModelId;
         }
         catch (OperationCanceledException) when (
             timeout.IsCancellationRequested &&
@@ -124,4 +131,3 @@ public sealed class WindowsCodexInstallationLocator : ICodexInstallationLocator
         }
     }
 }
-
