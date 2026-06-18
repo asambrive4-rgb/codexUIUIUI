@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CodexSwitcher.Bootstrapper/CodexSwitcher.Bootstrapper.csproj" />
+    <Project Path="src/CodexSwitcher.Core/CodexSwitcher.Core.csproj" />
+    <Project Path="src/CodexSwitcher.Infrastructure/CodexSwitcher.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CodexSwitcher.Tests/CodexSwitcher.Tests.csproj" />
+  </Folder>
+</Solution>
+

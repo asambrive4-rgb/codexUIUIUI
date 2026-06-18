@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AssemblyName>CodexSwitcher</AssemblyName>
+    <RootNamespace>CodexSwitcher.Bootstrapper</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CodexSwitcher.Core\CodexSwitcher.Core.csproj" />
+    <ProjectReference Include="..\CodexSwitcher.Infrastructure\CodexSwitcher.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
+
