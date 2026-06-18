@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using CodexSwitcher.Bootstrapper.Presentation;
 using CodexSwitcher.Core.Profiles;
 
@@ -78,52 +79,128 @@ public partial class MainWindow : Window
             return;
         }
 
+        var result = await _viewModel.SwitchProfileAsync(
+            profile.Id,
+            forceCloseApproved: false,
+            CancellationToken.None);
+        if (result.Status !=
+            SwitchProfileStatus.ForceCloseConfirmationRequired)
+        {
+            return;
+        }
+
+        if (!ConfirmForceCloseForSwitch())
+        {
+            return;
+        }
+
         await _viewModel.SwitchProfileAsync(
             profile.Id,
             forceCloseApproved: true,
             CancellationToken.None);
     }
 
-    private async void RecoverPreviousLogin_Click(
+    private async void DeleteProfile_Click(
         object sender,
         RoutedEventArgs e)
     {
-        var result = await _profileLogin.CancelAsync(
-            forceCloseApproved: false,
-            CancellationToken.None);
-
-        if (result.Status ==
-            CreateProfileLoginStatus.ForceCloseConfirmationRequired)
-        {
-            if (!ConfirmForceClose())
+        if (sender is not MenuItem
             {
-                return;
-            }
-
-            result = await _profileLogin.CancelAsync(
-                forceCloseApproved: true,
-                CancellationToken.None);
+                CommandParameter: ProfileListItemViewModel profile
+            })
+        {
+            return;
         }
 
-        if (result.Status == CreateProfileLoginStatus.Canceled)
+        if (profile.IsActive)
         {
-            await _viewModel.RefreshProfilesAsync(
-                CancellationToken.None);
             MessageBox.Show(
                 this,
-                "이전 인증 상태를 복구했습니다.",
-                "복구 완료",
+                MainWindowViewModel.DescribeDeleteResult(
+                    DeleteProfileStatus.ActiveProfileBlocked),
+                "프로필 삭제",
                 MessageBoxButton.OK,
-                MessageBoxImage.Information);
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        var confirmation = new DeleteProfileConfirmationWindow(
+            profile.Name)
+        {
+            Owner = this
+        };
+
+        if (confirmation.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var result = await _viewModel.DeleteProfileAsync(
+            profile.Id,
+            CancellationToken.None);
+        if (result.Status == DeleteProfileStatus.Deleted)
+        {
             return;
         }
 
         MessageBox.Show(
             this,
-            "이전 인증 상태를 복구하지 못했습니다. Codex가 완전히 종료됐는지 확인한 뒤 다시 시도하세요.",
-            "복구 실패",
+            MainWindowViewModel.DescribeDeleteResult(result.Status),
+            "프로필 삭제",
             MessageBoxButton.OK,
-            MessageBoxImage.Error);
+            result.Status == DeleteProfileStatus.Failed
+                ? MessageBoxImage.Error
+                : MessageBoxImage.Warning);
+    }
+
+    private async void RecoverPreviousLogin_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        RecoveryButton.IsEnabled = false;
+        try
+        {
+            var result = await _profileLogin.CancelAsync(
+                forceCloseApproved: false,
+                CancellationToken.None);
+
+            if (result.Status ==
+                CreateProfileLoginStatus.ForceCloseConfirmationRequired)
+            {
+                if (!ConfirmForceClose())
+                {
+                    return;
+                }
+
+                result = await _profileLogin.CancelAsync(
+                    forceCloseApproved: true,
+                    CancellationToken.None);
+            }
+
+            if (result.Status == CreateProfileLoginStatus.Canceled)
+            {
+                await _viewModel.RefreshProfilesAsync(
+                    CancellationToken.None);
+                MessageBox.Show(
+                    this,
+                    "이전 인증 상태를 복구했습니다.",
+                    "복구 완료",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            MessageBox.Show(
+                this,
+                "이전 인증 상태를 복구하지 못했습니다. Codex가 완전히 종료됐는지 확인한 뒤 다시 시도하세요.",
+                "복구 실패",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            RecoveryButton.IsEnabled = true;
+        }
     }
 
     private bool ConfirmForceClose()
@@ -132,6 +209,17 @@ public partial class MainWindow : Window
                    this,
                    "Codex가 정상적으로 종료되지 않았습니다. 저장되지 않은 작업이 손실될 수 있습니다.\n\n강제 종료 후 계속하시겠습니까?",
                    "강제 종료 확인",
+                   MessageBoxButton.YesNo,
+                   MessageBoxImage.Warning,
+                   MessageBoxResult.No) == MessageBoxResult.Yes;
+    }
+
+    private bool ConfirmForceCloseForSwitch()
+    {
+        return MessageBox.Show(
+                   this,
+                   "Codex가 정상적으로 종료되지 않았습니다. 저장되지 않은 작업이 손실될 수 있습니다.\n\n강제 종료 후 전환하시겠습니까?",
+                   "강제 종료 후 전환",
                    MessageBoxButton.YesNo,
                    MessageBoxImage.Warning,
                    MessageBoxResult.No) == MessageBoxResult.Yes;

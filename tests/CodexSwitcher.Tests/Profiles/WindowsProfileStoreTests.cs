@@ -284,6 +284,31 @@ public sealed class WindowsProfileStoreTests
     }
 
     [TestMethod]
+    public async Task Delete_WithUnexpectedProfileFile_RefusesDeletion()
+    {
+        var profile = CreateProfile("Work");
+        var store = new WindowsProfileStore(_storageRoot);
+        await store.SaveAsync(
+            profile,
+            "credential"u8.ToArray(),
+            CancellationToken.None);
+        var unexpected = Path.Combine(
+            ProfileDirectory(profile),
+            "unexpected.txt");
+        await File.WriteAllTextAsync(unexpected, "keep");
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(
+            () => store.DeleteAsync(
+                profile.Id,
+                CancellationToken.None));
+
+        Assert.IsTrue(File.Exists(unexpected));
+        Assert.IsTrue(File.Exists(MetadataPath(profile)));
+        Assert.IsTrue(File.Exists(CredentialPath(profile)));
+        Assert.IsTrue(Directory.Exists(ProfileDirectory(profile)));
+    }
+
+    [TestMethod]
     public async Task StorageDirectories_AllowOnlyCurrentUserAndSystem()
     {
         var profile = CreateProfile("Work");

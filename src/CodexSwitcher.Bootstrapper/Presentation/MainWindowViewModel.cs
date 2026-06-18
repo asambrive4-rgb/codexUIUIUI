@@ -13,6 +13,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly CreateProfileLoginUseCase _profileLogin;
     private readonly RunProfileUseCase _runProfile;
     private readonly SwitchProfileUseCase _switchProfile;
+    private readonly DeleteProfileUseCase _deleteProfile;
     private readonly GetProfileRuntimeStateUseCase _getRuntimeState;
     private readonly SemaphoreSlim _runtimeRefreshGate = new(1, 1);
     private string _installationStatusMessage = "Codex 설치 확인 중...";
@@ -28,6 +29,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         CreateProfileLoginUseCase profileLogin,
         RunProfileUseCase runProfile,
         SwitchProfileUseCase switchProfile,
+        DeleteProfileUseCase deleteProfile,
         GetProfileRuntimeStateUseCase getRuntimeState)
     {
         _detectInstallation = detectInstallation;
@@ -35,6 +37,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _profileLogin = profileLogin;
         _runProfile = runProfile;
         _switchProfile = switchProfile;
+        _deleteProfile = deleteProfile;
         _getRuntimeState = getRuntimeState;
     }
 
@@ -165,6 +168,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             RuntimeStatusMessage =
                 "Codex 상태를 확인하지 못했습니다.";
             DisableAllRunButtons();
+            DisableAllDeleteButtons();
         }
         finally
         {
@@ -192,6 +196,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         OperationStatusMessage = "선택한 프로필로 Codex 실행 중...";
         DisableAllRunButtons();
+        DisableAllDeleteButtons();
 
         RunProfileResult result;
         try
@@ -235,6 +240,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         OperationStatusMessage =
             "선택한 프로필로 Codex 전환 중...";
         DisableAllRunButtons();
+        DisableAllDeleteButtons();
 
         SwitchProfileResult result;
         try
@@ -258,6 +264,57 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         return result;
     }
 
+    public async Task<DeleteProfileResult> DeleteProfileAsync(
+        ProfileId profileId,
+        CancellationToken cancellationToken)
+    {
+        if (_isOperationInProgress)
+        {
+            return new DeleteProfileResult(
+                DeleteProfileStatus.Failed);
+        }
+
+        SetOperationInProgress(true);
+        var target = Profiles.FirstOrDefault(
+            profile => profile.Id == profileId);
+        if (target is not null)
+        {
+            target.Status = "삭제 중...";
+        }
+
+        OperationStatusMessage = "선택한 프로필 삭제 중...";
+        DisableAllRunButtons();
+        DisableAllDeleteButtons();
+
+        DeleteProfileResult result;
+        try
+        {
+            result = await _deleteProfile.ExecuteAsync(
+                profileId,
+                cancellationToken);
+            OperationStatusMessage =
+                DescribeDeleteResult(result.Status);
+        }
+        finally
+        {
+            SetOperationInProgress(false);
+        }
+
+        HasPendingRecovery =
+            await _profileLogin.HasPendingRecoveryAsync(
+                cancellationToken);
+        if (result.Status == DeleteProfileStatus.Deleted)
+        {
+            await RefreshProfilesAsync(cancellationToken);
+        }
+        else
+        {
+            await RefreshRuntimeStateAsync(cancellationToken);
+        }
+
+        return result;
+    }
+
     private void ApplyRuntimeState(ProfileRuntimeState state)
     {
         switch (state.Status)
@@ -271,6 +328,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                     profile.ButtonText = "실행";
                     profile.IsSwitchAction = false;
                     profile.IsRunEnabled =
+                        !HasPendingRecovery &&
+                        !_isOperationInProgress;
+                    profile.IsDeleteEnabled =
                         !HasPendingRecovery &&
                         !_isOperationInProgress;
                 }
@@ -303,6 +363,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                         active is not null &&
                         !HasPendingRecovery &&
                         !_isOperationInProgress;
+                    profile.IsDeleteEnabled =
+                        !HasPendingRecovery &&
+                        !_isOperationInProgress;
                 }
 
                 break;
@@ -317,6 +380,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                     profile.ButtonText = "전환";
                     profile.IsSwitchAction = true;
                     profile.IsRunEnabled = false;
+                    profile.IsDeleteEnabled =
+                        !HasPendingRecovery &&
+                        !_isOperationInProgress;
                 }
 
                 break;
@@ -328,6 +394,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         foreach (var profile in Profiles)
         {
             profile.IsRunEnabled = false;
+        }
+    }
+
+    private void DisableAllDeleteButtons()
+    {
+        foreach (var profile in Profiles)
+        {
+            profile.IsDeleteEnabled = false;
         }
     }
 
@@ -390,6 +464,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         };
     }
 
+    public static string DescribeDeleteResult(DeleteProfileStatus status)
+    {
+        return status switch
+        {
+            DeleteProfileStatus.Deleted =>
+                "프로필을 삭제했습니다.",
+            DeleteProfileStatus.ProfileNotFound =>
+                "선택한 프로필을 찾을 수 없습니다.",
+            DeleteProfileStatus.ActiveProfileBlocked =>
+                "실행 중인 프로필은 바로 삭제할 수 없습니다. Codex를 종료하거나 다른 프로필로 전환한 뒤 다시 시도하세요.",
+            DeleteProfileStatus.RunningProfileUnknown =>
+                "현재 실행 중인 Codex 프로필을 확인할 수 없어 삭제하지 않았습니다. Codex를 종료한 뒤 다시 시도하세요.",
+            DeleteProfileStatus.RecoveryRequired =>
+                "인증 복구가 필요합니다. 이전 로그인 작업 복구를 실행하세요.",
+            _ => "프로필 삭제에 실패했습니다. 목록은 변경하지 않았습니다."
+        };
+    }
+
     private bool SetField<T>(
         ref T field,
         T value,
@@ -419,6 +511,7 @@ public sealed class ProfileListItemViewModel : INotifyPropertyChanged
     private string _status = "준비됨";
     private string _buttonText = "실행";
     private bool _isRunEnabled = true;
+    private bool _isDeleteEnabled = true;
     private bool _isSwitchAction;
     private bool _isActive;
 
@@ -446,6 +539,12 @@ public sealed class ProfileListItemViewModel : INotifyPropertyChanged
     {
         get => _isRunEnabled;
         set => SetField(ref _isRunEnabled, value);
+    }
+
+    public bool IsDeleteEnabled
+    {
+        get => _isDeleteEnabled;
+        set => SetField(ref _isDeleteEnabled, value);
     }
 
     public string ButtonText

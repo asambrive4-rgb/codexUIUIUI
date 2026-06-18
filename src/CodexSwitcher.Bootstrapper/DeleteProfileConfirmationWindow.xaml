@@ -1,0 +1,53 @@
+<Window x:Class="CodexSwitcher.Bootstrapper.DeleteProfileConfirmationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="프로필 삭제"
+        Width="500"
+        MinWidth="440"
+        MinHeight="270"
+        ResizeMode="NoResize"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner">
+    <Grid Background="#FFF7F7F8">
+        <Border Margin="24"
+                Padding="22"
+                Background="White"
+                BorderBrush="#FFE2E2E5"
+                BorderThickness="1"
+                CornerRadius="8">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Bottom"
+                            Margin="0,20,0,0"
+                            HorizontalAlignment="Right"
+                            Orientation="Horizontal">
+                    <Button MinWidth="84"
+                            AutomationProperties.Name="삭제 취소"
+                            Padding="12,6"
+                            Click="Cancel_Click"
+                            Content="취소"
+                            IsCancel="True" />
+                    <Button MinWidth="220"
+                            AutomationProperties.Name="프로필 및 로그인 정보 삭제"
+                            Margin="8,0,0,0"
+                            Padding="12,6"
+                            Click="Delete_Click"
+                            Content="프로필 및 로그인 정보 삭제"
+                            IsDefault="False" />
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="#FF202123"
+                               Text="{Binding TitleText}"
+                               TextWrapping="Wrap" />
+                    <TextBlock Margin="0,12,0,0"
+                               FontSize="14"
+                               Foreground="#FF4A4A4F"
+                               Text="이 프로필에 저장된 Codex 로그인 정보가 삭제됩니다. 공통 Codex 작업 데이터와 설정은 삭제되지 않습니다. 로그인 정보 삭제는 되돌릴 수 없습니다."
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

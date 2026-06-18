@@ -39,6 +39,11 @@ public partial class App : Application
             authenticationSession,
             codexController,
             operationCoordinator);
+        var deleteProfile = new DeleteProfileUseCase(
+            profileStore,
+            authenticationSession,
+            codexController,
+            operationCoordinator);
         var getRuntimeState =
             new GetProfileRuntimeStateUseCase(
                 profileStore,
@@ -50,6 +55,7 @@ public partial class App : Application
             profileLogin,
             runProfile,
             switchProfile,
+            deleteProfile,
             getRuntimeState);
         var window = new MainWindow(viewModel, profileLogin);
 
