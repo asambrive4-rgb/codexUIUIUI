@@ -6,13 +6,12 @@ namespace CodexSwitcher.Tests.Profiles;
 public sealed class SwitchProfileUseCaseTests
 {
     [TestMethod]
-    public async Task Execute_FromRunningKnownProfile_StopsAppliesTargetAndRuns()
+    public async Task Execute_FromRunningKnownProfile_ForceStopsAppliesTargetAndRuns()
     {
         var fixture = new Fixture();
 
         var result = await fixture.UseCase.ExecuteAsync(
             fixture.TargetProfile.Id,
-            forceCloseApproved: false,
             CancellationToken.None);
 
         Assert.AreEqual(SwitchProfileStatus.Switched, result.Status);
@@ -22,11 +21,20 @@ public sealed class SwitchProfileUseCaseTests
         Assert.IsFalse(fixture.Authentication.HasRecovery);
         CollectionAssert.Contains(
             fixture.Events,
-            "codex:request-stop");
+            "codex:force-stop");
         CollectionAssert.Contains(
             fixture.Events,
             "auth:prepare-profile");
-        Assert.AreEqual(0, fixture.Codex.ForceStopCount);
+        Assert.AreEqual(1, fixture.Codex.ForceStopCount);
+        CollectionAssert.DoesNotContain(
+            fixture.Events,
+            "codex:request-stop");
+        Assert.IsLessThan(
+            fixture.Events.IndexOf("auth:prepare-profile"),
+            fixture.Events.IndexOf("codex:force-stop"));
+        Assert.IsLessThan(
+            fixture.Events.IndexOf("codex:launch"),
+            fixture.Events.IndexOf("auth:prepare-profile"));
     }
 
     [TestMethod]
@@ -38,7 +46,6 @@ public sealed class SwitchProfileUseCaseTests
 
         var result = await fixture.UseCase.ExecuteAsync(
             fixture.TargetProfile.Id,
-            forceCloseApproved: false,
             CancellationToken.None);
 
         Assert.AreEqual(
@@ -61,7 +68,6 @@ public sealed class SwitchProfileUseCaseTests
 
         var result = await fixture.UseCase.ExecuteAsync(
             fixture.TargetProfile.Id,
-            forceCloseApproved: false,
             CancellationToken.None);
 
         Assert.AreEqual(
@@ -76,43 +82,28 @@ public sealed class SwitchProfileUseCaseTests
     }
 
     [TestMethod]
-    public async Task Execute_WhenStopRequiresForceWithoutApproval_AsksForConfirmation()
+    public async Task Execute_WhenForceStopFails_DoesNotChangeAuthentication()
     {
         var fixture = new Fixture();
-        fixture.Codex.StopStatus =
-            CodexStopStatus.ForceCloseRequired;
+        fixture.Codex.ForceStopResult = false;
 
         var result = await fixture.UseCase.ExecuteAsync(
             fixture.TargetProfile.Id,
-            forceCloseApproved: false,
             CancellationToken.None);
 
         Assert.AreEqual(
-            SwitchProfileStatus.ForceCloseConfirmationRequired,
+            SwitchProfileStatus.Failed,
             result.Status);
-        Assert.AreEqual(0, fixture.Codex.ForceStopCount);
+        Assert.AreEqual(1, fixture.Codex.ForceStopCount);
+        CollectionAssert.AreEqual(
+            fixture.ActiveCredential,
+            fixture.Authentication.CurrentCredential);
         CollectionAssert.DoesNotContain(
             fixture.Events,
             "auth:prepare-profile");
-    }
-
-    [TestMethod]
-    public async Task Execute_WhenForceApproved_ForceStopsAndSwitches()
-    {
-        var fixture = new Fixture();
-        fixture.Codex.StopStatus =
-            CodexStopStatus.ForceCloseRequired;
-
-        var result = await fixture.UseCase.ExecuteAsync(
-            fixture.TargetProfile.Id,
-            forceCloseApproved: true,
-            CancellationToken.None);
-
-        Assert.AreEqual(SwitchProfileStatus.Switched, result.Status);
-        Assert.AreEqual(1, fixture.Codex.ForceStopCount);
-        CollectionAssert.AreEqual(
-            fixture.TargetCredential,
-            fixture.Authentication.CurrentCredential);
+        CollectionAssert.DoesNotContain(
+            fixture.Events,
+            "codex:launch");
     }
 
     [TestMethod]
@@ -122,7 +113,6 @@ public sealed class SwitchProfileUseCaseTests
 
         var result = await fixture.UseCase.ExecuteAsync(
             ProfileId.New(),
-            forceCloseApproved: false,
             CancellationToken.None);
 
         Assert.AreEqual(
@@ -145,7 +135,6 @@ public sealed class SwitchProfileUseCaseTests
 
         var result = await fixture.UseCase.ExecuteAsync(
             fixture.TargetProfile.Id,
-            forceCloseApproved: false,
             CancellationToken.None);
 
         Assert.AreEqual(
@@ -166,7 +155,6 @@ public sealed class SwitchProfileUseCaseTests
 
         var result = await fixture.UseCase.ExecuteAsync(
             fixture.TargetProfile.Id,
-            forceCloseApproved: false,
             CancellationToken.None);
 
         Assert.AreEqual(
@@ -188,7 +176,6 @@ public sealed class SwitchProfileUseCaseTests
 
         var result = await fixture.UseCase.ExecuteAsync(
             fixture.TargetProfile.Id,
-            forceCloseApproved: false,
             CancellationToken.None);
 
         Assert.AreEqual(
@@ -382,6 +369,8 @@ public sealed class SwitchProfileUseCaseTests
         public CodexStopStatus StopStatus { get; set; } =
             CodexStopStatus.Stopped;
 
+        public bool ForceStopResult { get; set; } = true;
+
         public int ForceStopCount { get; private set; }
 
         public Task<bool> IsRunningAsync(
@@ -403,7 +392,7 @@ public sealed class SwitchProfileUseCaseTests
         {
             _events.Add("codex:force-stop");
             ForceStopCount++;
-            return Task.FromResult(true);
+            return Task.FromResult(ForceStopResult);
         }
 
         public Task<CodexLaunchStatus> LaunchAsync(

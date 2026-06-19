@@ -80,24 +80,8 @@ public partial class MainWindow : FluentWindow
             return;
         }
 
-        var result = await _viewModel.SwitchProfileAsync(
-            profile.Id,
-            forceCloseApproved: false,
-            CancellationToken.None);
-        if (result.Status !=
-            SwitchProfileStatus.ForceCloseConfirmationRequired)
-        {
-            return;
-        }
-
-        if (!ConfirmForceCloseForSwitch())
-        {
-            return;
-        }
-
         await _viewModel.SwitchProfileAsync(
             profile.Id,
-            forceCloseApproved: true,
             CancellationToken.None);
     }
 
@@ -210,17 +194,6 @@ public partial class MainWindow : FluentWindow
                    this,
                    "Codex가 정상적으로 종료되지 않았습니다. 저장되지 않은 작업이 손실될 수 있습니다.\n\n강제 종료 후 계속하시겠습니까?",
                    "강제 종료 확인",
-                   MessageBoxButton.YesNo,
-                   MessageBoxImage.Warning,
-                   MessageBoxResult.No) == MessageBoxResult.Yes;
-    }
-
-    private bool ConfirmForceCloseForSwitch()
-    {
-        return MessageBox.Show(
-                   this,
-                   "Codex가 정상적으로 종료되지 않았습니다. 저장되지 않은 작업이 손실될 수 있습니다.\n\n강제 종료 후 전환하시겠습니까?",
-                   "강제 종료 후 전환",
                    MessageBoxButton.YesNo,
                    MessageBoxImage.Warning,
                    MessageBoxResult.No) == MessageBoxResult.Yes;

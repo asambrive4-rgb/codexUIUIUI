@@ -81,9 +81,9 @@ public sealed class WindowsCodexLoginController : ICodexLoginController
     public async Task<bool> ForceStopAsync(
         CancellationToken cancellationToken)
     {
-        // 임시방편: 현재 Store형 Codex가 정상 종료 요청에 응답하지 않는
-        // 경우가 있어 사용자 동의 후에만 강제 종료한다. 추후 신뢰할 수
-        // 있는 정상 종료 방식을 찾으면 이 분기를 교체해야 한다.
+        // 현재 Store형 Codex가 정상 종료 요청에 응답하지 않는 경우가
+        // 있어 계정 전환에서는 이 경로로 즉시 종료한다. 추후 신뢰할 수
+        // 있는 정상 종료 방식을 찾으면 이 구현을 교체해야 한다.
         var processes = GetCodexProcesses();
 
         try

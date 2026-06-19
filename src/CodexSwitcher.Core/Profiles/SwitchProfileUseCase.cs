@@ -23,7 +23,6 @@ public sealed class SwitchProfileUseCase
 
     public async Task<SwitchProfileResult> ExecuteAsync(
         ProfileId profileId,
-        bool forceCloseApproved,
         CancellationToken cancellationToken)
     {
         using var operation =
@@ -91,12 +90,10 @@ public sealed class SwitchProfileUseCase
                     return Result(SwitchProfileStatus.AlreadyRunningTarget);
                 }
 
-                var stopResult = await EnsureStoppedAsync(
-                    forceCloseApproved,
-                    cancellationToken);
-                if (stopResult is not null)
+                if (!await _codexController.ForceStopAsync(
+                        cancellationToken))
                 {
-                    return stopResult;
+                    return Result(SwitchProfileStatus.Failed);
                 }
             }
 
@@ -237,39 +234,10 @@ public sealed class SwitchProfileUseCase
         return match;
     }
 
-    private async Task<SwitchProfileResult?> EnsureStoppedAsync(
-        bool forceCloseApproved,
-        CancellationToken cancellationToken)
-    {
-        var stopStatus = await _codexController.RequestStopAsync(
-            cancellationToken);
-        if (stopStatus == CodexStopStatus.Stopped)
-        {
-            return null;
-        }
-
-        if (stopStatus == CodexStopStatus.Failed)
-        {
-            return Result(SwitchProfileStatus.Failed);
-        }
-
-        if (!forceCloseApproved)
-        {
-            return Result(
-                SwitchProfileStatus.ForceCloseConfirmationRequired);
-        }
-
-        return await _codexController.ForceStopAsync(cancellationToken)
-            ? null
-            : Result(SwitchProfileStatus.Failed);
-    }
-
     private async Task<SwitchProfileResult> StopAndRestoreAfterMismatchAsync(
         CancellationToken cancellationToken)
     {
-        var stopStatus = await _codexController.RequestStopAsync(
-            cancellationToken);
-        return stopStatus == CodexStopStatus.Stopped
+        return await _codexController.ForceStopAsync(cancellationToken)
             ? await RestoreAfterFailureAsync(
                 SwitchProfileStatus.AuthenticationMismatch,
                 cancellationToken)

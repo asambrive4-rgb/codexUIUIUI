@@ -6,7 +6,6 @@ public enum SwitchProfileStatus
     AlreadyRunningTarget,
     ProfileNotFound,
     RunningUnknownProfile,
-    ForceCloseConfirmationRequired,
     InstallationNotFound,
     LaunchFailed,
     AuthenticationMismatch,

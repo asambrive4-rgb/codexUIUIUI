@@ -220,7 +220,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public async Task<SwitchProfileResult> SwitchProfileAsync(
         ProfileId profileId,
-        bool forceCloseApproved,
         CancellationToken cancellationToken)
     {
         if (_isOperationInProgress)
@@ -247,7 +246,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             result = await _switchProfile.ExecuteAsync(
                 profileId,
-                forceCloseApproved,
                 cancellationToken);
             OperationStatusMessage =
                 DescribeSwitchResult(result.Status);
@@ -450,8 +448,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 "선택한 프로필을 찾을 수 없습니다.",
             SwitchProfileStatus.RunningUnknownProfile =>
                 "현재 실행 중인 Codex 프로필을 확인할 수 없어 전환하지 않았습니다.",
-            SwitchProfileStatus.ForceCloseConfirmationRequired =>
-                "Codex가 정상 종료되지 않았습니다. 강제 종료 확인이 필요합니다.",
             SwitchProfileStatus.InstallationNotFound =>
                 "실행할 수 있는 Codex 설치를 찾지 못했습니다.",
             SwitchProfileStatus.LaunchFailed =>
