@@ -2,10 +2,11 @@ using System.Windows;
 using System.Windows.Controls;
 using CodexSwitcher.Bootstrapper.Presentation;
 using CodexSwitcher.Core.Profiles;
+using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 
 namespace CodexSwitcher.Bootstrapper;
 
-public partial class MainWindow : Window
+public partial class MainWindow : FluentWindow
 {
     private readonly MainWindowViewModel _viewModel;
     private readonly CreateProfileLoginUseCase _profileLogin;

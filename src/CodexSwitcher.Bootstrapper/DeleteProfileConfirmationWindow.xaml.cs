@@ -1,8 +1,9 @@
 using System.Windows;
+using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 
 namespace CodexSwitcher.Bootstrapper;
 
-public partial class DeleteProfileConfirmationWindow : Window
+public partial class DeleteProfileConfirmationWindow : FluentWindow
 {
     public DeleteProfileConfirmationWindow(string profileName)
     {

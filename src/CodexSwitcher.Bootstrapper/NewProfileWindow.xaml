@@ -1,62 +1,101 @@
-<Window x:Class="CodexSwitcher.Bootstrapper.NewProfileWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="새 프로필 추가"
-        Width="460"
-        Height="330"
-        ResizeMode="NoResize"
-        WindowStartupLocation="CenterOwner">
-    <Grid Margin="24">
+<ui:FluentWindow x:Class="CodexSwitcher.Bootstrapper.NewProfileWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="새 프로필 추가"
+                 Width="480"
+                 Height="350"
+                 ResizeMode="NoResize"
+                 Background="{DynamicResource AppBrush.WindowBackground}"
+                 ExtendsContentIntoTitleBar="True"
+                 Icon="Assets/codexUIUIUI.ico"
+                 WindowStartupLocation="CenterOwner">
+    <Grid Background="{DynamicResource AppBrush.WindowBackground}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="46" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock FontSize="22"
-                   FontWeight="SemiBold"
-                   Text="새 프로필 추가" />
-        <StackPanel Grid.Row="1"
-                    Margin="0,20,0,0">
-            <TextBlock Text="프로필 이름" />
-            <TextBox x:Name="ProfileNameTextBox"
-                     Margin="0,6,0,0"
-                     MinHeight="32"
-                     MaxLength="80"
-                     VerticalContentAlignment="Center" />
-        </StackPanel>
-        <Border Grid.Row="2"
-                Margin="0,18,0,0"
-                Padding="14"
-                Background="#FFF3F3F5"
-                CornerRadius="8">
-            <TextBlock x:Name="StatusTextBlock"
-                       TextWrapping="Wrap"
-                       Text="이메일이나 비밀번호는 이 앱에 입력하지 않습니다. Codex의 기존 로그인 화면을 사용합니다." />
-        </Border>
-        <StackPanel Grid.Row="3"
-                    Margin="0,20,0,0"
-                    HorizontalAlignment="Right"
-                    Orientation="Horizontal">
-            <Button x:Name="CancelButton"
-                    MinWidth="82"
-                    Padding="12,7"
-                    Click="Cancel_Click"
-                    Content="취소" />
-            <Button x:Name="StartButton"
-                    Margin="8,0,0,0"
-                    MinWidth="120"
-                    Padding="12,7"
-                    Click="Start_Click"
-                    Content="생성 및 로그인" />
-            <Button x:Name="CompleteButton"
-                    Margin="8,0,0,0"
-                    MinWidth="110"
-                    Padding="12,7"
-                    Click="Complete_Click"
-                    Content="로그인 완료"
-                    Visibility="Collapsed" />
-        </StackPanel>
+        <ui:TitleBar Grid.Row="0"
+                     Height="46"
+                     Background="{DynamicResource AppBrush.TitleBar}"
+                     ShowMaximize="False">
+            <ui:TitleBar.Header>
+                <StackPanel Margin="16,0,0,0"
+                            Orientation="Horizontal">
+                    <Image Width="20"
+                           Height="20"
+                           Margin="0,0,9,0"
+                           VerticalAlignment="Center"
+                           Source="Assets/codexUIUIUI.png" />
+                    <TextBlock Style="{StaticResource TitleBarCaptionTextStyle}"
+                               Text="새 프로필 추가" />
+                </StackPanel>
+            </ui:TitleBar.Header>
+        </ui:TitleBar>
+
+        <Grid Grid.Row="1"
+              Margin="26,18,26,26">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel>
+                <TextBlock Style="{StaticResource SectionTitleTextStyle}"
+                           Text="프로필 만들기" />
+                <TextBlock Margin="0,8,0,0"
+                           Style="{StaticResource MutedTextStyle}"
+                           Text="프로필 이름을 정한 뒤 Codex의 기존 로그인 화면에서 로그인합니다." />
+            </StackPanel>
+            <StackPanel Grid.Row="1"
+                        Margin="0,22,0,0">
+                <TextBlock FontWeight="SemiBold"
+                           Foreground="{DynamicResource AppBrush.Text}"
+                           Text="프로필 이름" />
+                <TextBox x:Name="ProfileNameTextBox"
+                         Margin="0,8,0,0"
+                         MinHeight="36"
+                         MaxLength="80"
+                         Padding="10,6"
+                         VerticalContentAlignment="Center" />
+            </StackPanel>
+            <Border Grid.Row="2"
+                    Margin="0,18,0,0"
+                    Style="{StaticResource DialogStatusPanelStyle}">
+                <TextBlock x:Name="StatusTextBlock"
+                           Foreground="{DynamicResource AppBrush.TextMuted}"
+                           TextWrapping="Wrap"
+                           Text="이메일이나 비밀번호는 이 앱에 입력하지 않습니다. Codex의 기존 로그인 화면을 사용합니다." />
+            </Border>
+            <StackPanel Grid.Row="3"
+                        Margin="0,20,0,0"
+                        HorizontalAlignment="Right"
+                        Orientation="Horizontal">
+                <Button x:Name="CancelButton"
+                        MinWidth="82"
+                        MinHeight="34"
+                        Padding="12,7"
+                        Click="Cancel_Click"
+                        Content="취소" />
+                <Button x:Name="StartButton"
+                        Margin="8,0,0,0"
+                        MinWidth="120"
+                        MinHeight="34"
+                        Padding="12,7"
+                        Click="Start_Click"
+                        Content="생성 및 로그인" />
+                <Button x:Name="CompleteButton"
+                        Margin="8,0,0,0"
+                        MinWidth="110"
+                        MinHeight="34"
+                        Padding="12,7"
+                        Click="Complete_Click"
+                        Content="로그인 완료"
+                        Visibility="Collapsed" />
+            </StackPanel>
+        </Grid>
     </Grid>
-</Window>
+</ui:FluentWindow>

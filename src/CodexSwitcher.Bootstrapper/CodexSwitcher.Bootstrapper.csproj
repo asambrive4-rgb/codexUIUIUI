@@ -9,12 +9,18 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AssemblyName>CodexSwitcher</AssemblyName>
     <RootNamespace>CodexSwitcher.Bootstrapper</RootNamespace>
+    <ApplicationIcon>Assets\codexUIUIUI.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
     <ProjectReference Include="..\CodexSwitcher.Core\CodexSwitcher.Core.csproj" />
     <ProjectReference Include="..\CodexSwitcher.Infrastructure\CodexSwitcher.Infrastructure.csproj" />
   </ItemGroup>
 
-</Project>
+  <ItemGroup>
+    <Resource Include="Assets\codexUIUIUI.ico" />
+    <Resource Include="Assets\codexUIUIUI.png" />
+  </ItemGroup>
 
+</Project>

@@ -1,177 +1,279 @@
-<Window x:Class="CodexSwitcher.Bootstrapper.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Codex Account Switcher"
-        Width="660"
-        Height="700"
-        MinWidth="560"
-        MinHeight="560"
-        WindowStartupLocation="CenterScreen">
-    <Window.Resources>
+<ui:FluentWindow x:Class="CodexSwitcher.Bootstrapper.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Codex Account Switcher"
+                 Width="720"
+                 Height="720"
+                 MinWidth="600"
+                 MinHeight="580"
+                 Background="{DynamicResource AppBrush.WindowBackground}"
+                 ExtendsContentIntoTitleBar="True"
+                 Icon="Assets/codexUIUIUI.ico"
+                 WindowStartupLocation="CenterScreen">
+    <ui:FluentWindow.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-    </Window.Resources>
-    <Grid Background="#FFF7F7F8">
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+    </ui:FluentWindow.Resources>
+    <Grid Background="{DynamicResource AppBrush.WindowBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0"
+                     Height="48"
+                     Background="{DynamicResource AppBrush.TitleBar}">
+            <ui:TitleBar.Header>
+                <StackPanel Margin="16,0,0,0"
+                            Orientation="Horizontal">
+                    <Image Width="22"
+                           Height="22"
+                           Margin="0,0,9,0"
+                           VerticalAlignment="Center"
+                           Source="Assets/codexUIUIUI.png" />
+                    <TextBlock Style="{StaticResource TitleBarCaptionTextStyle}"
+                               Text="Codex Account Switcher" />
+                </StackPanel>
+            </ui:TitleBar.Header>
+            <ui:TitleBar.CenterContent>
+                <Border MaxWidth="310"
+                        Padding="10,5"
+                        Background="{DynamicResource AppBrush.InfoSurface}"
+                        CornerRadius="8">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="7"
+                                 Height="7"
+                                 Margin="0,0,7,0"
+                                 Fill="{DynamicResource AppBrush.Accent}" />
+                        <TextBlock AutomationProperties.Name="{Binding RuntimeStatusMessage}"
+                                   MaxWidth="260"
+                                   Style="{StaticResource TitleBarStatusTextStyle}"
+                                   Text="{Binding RuntimeStatusMessage}" />
+                    </StackPanel>
+                </Border>
+            </ui:TitleBar.CenterContent>
+            <ui:TitleBar.TrailingContent>
+                <Button Margin="0,0,12,0"
+                        AutomationProperties.Name="새 프로필 추가"
+                        MinWidth="118"
+                        MinHeight="32"
+                        Padding="14,5"
+                        Click="AddProfile_Click"
+                        IsEnabled="{Binding CanAddProfile}"
+                        Content="새 프로필 추가" />
+            </ui:TitleBar.TrailingContent>
+        </ui:TitleBar>
+
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
-            <Border Margin="24"
-                    Padding="24"
-                    Background="White"
-                    BorderBrush="#FFE2E2E5"
-                    BorderThickness="1"
-                    CornerRadius="8">
-                <Grid>
+            <Grid Margin="28,18,28,28">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0"
+                        Padding="16"
+                        Background="{DynamicResource AppBrush.Surface}"
+                        BorderBrush="{DynamicResource AppBrush.Border}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <TextBlock FontSize="14"
+                               Style="{StaticResource MutedTextStyle}"
+                               Text="Codex 계정 프로필을 선택해 실행하거나 전환하세요. 로그인 정보는 이 PC에만 보관됩니다." />
+                </Border>
+
+                <Grid Grid.Row="1"
+                      Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0"
+                            Style="{StaticResource StatusPanelStyle}">
+                        <StackPanel>
+                            <TextBlock FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppBrush.TextMuted}"
+                                       Text="설치 상태" />
+                            <TextBlock Margin="0,6,0,0"
+                                       AutomationProperties.Name="{Binding InstallationStatusMessage}"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppBrush.Text}"
+                                       Text="{Binding InstallationStatusMessage}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2"
+                            Style="{StaticResource StatusPanelStyle}"
+                            Background="{DynamicResource AppBrush.InfoSurface}">
+                        <StackPanel>
+                            <TextBlock FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppBrush.InfoText}"
+                                       Text="실행 상태" />
+                            <TextBlock Margin="0,6,0,0"
+                                       AutomationProperties.Name="{Binding RuntimeStatusMessage}"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppBrush.InfoText}"
+                                       Text="{Binding RuntimeStatusMessage}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <StackPanel Grid.Row="2"
+                            Margin="0,12,0,0">
+                    <TextBlock Margin="2,0,2,0"
+                               AutomationProperties.Name="{Binding OperationStatusMessage}"
+                               Foreground="{DynamicResource AppBrush.WarningText}"
+                               Text="{Binding OperationStatusMessage}"
+                               TextWrapping="Wrap" />
+                    <Border Margin="0,12,0,0"
+                            Style="{StaticResource StatusPanelStyle}"
+                            Background="{DynamicResource AppBrush.WarningSurface}"
+                            Visibility="{Binding HasPendingRecovery, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppBrush.WarningText}"
+                                       Text="완료되지 않은 로그인 작업이 있습니다." />
+                            <TextBlock Margin="0,5,0,12"
+                                       Foreground="{DynamicResource AppBrush.WarningText}"
+                                       Text="새 프로필을 추가하기 전에 이전 인증 상태를 복구해야 합니다."
+                                       TextWrapping="Wrap" />
+                            <Button x:Name="RecoveryButton"
+                                    MinWidth="190"
+                                    MinHeight="34"
+                                    HorizontalAlignment="Left"
+                                    Click="RecoverPreviousLogin_Click"
+                                    Content="이전 로그인 작업 복구" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <Grid Grid.Row="3"
+                      Margin="0,20,0,0">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0">
-                        <TextBlock FontSize="28"
-                                   FontWeight="SemiBold"
-                                   Foreground="#FF202123"
-                                   Text="Codex Account Switcher" />
-                        <TextBlock Margin="0,10,0,0"
-                                   FontSize="14"
-                                   Foreground="#FF6B6B70"
-                                   Text="Windows용 Codex 계정 전환 도구" />
-                        <Border Margin="0,20,0,0"
-                                Padding="14"
-                                Background="#FFF3F3F5"
-                                CornerRadius="8">
-                            <TextBlock AutomationProperties.Name="{Binding InstallationStatusMessage}"
-                                       FontSize="14"
-                                       FontWeight="Medium"
-                                       Foreground="#FF303033"
-                                       Text="{Binding InstallationStatusMessage}"
-                                       TextWrapping="Wrap" />
-                        </Border>
-                        <Border Margin="0,8,0,0"
-                                Padding="14"
-                                Background="#FFEAF3FF"
-                                CornerRadius="8">
-                            <TextBlock AutomationProperties.Name="{Binding RuntimeStatusMessage}"
-                                       FontSize="14"
-                                       FontWeight="Medium"
-                                       Foreground="#FF264B72"
-                                       Text="{Binding RuntimeStatusMessage}"
-                                       TextWrapping="Wrap" />
-                        </Border>
-                        <TextBlock Margin="2,8,2,0"
-                                   AutomationProperties.Name="{Binding OperationStatusMessage}"
-                                   Foreground="#FF6B4B20"
-                                   Text="{Binding OperationStatusMessage}"
-                                   TextWrapping="Wrap" />
-                        <Border Margin="0,12,0,0"
-                                Padding="14"
-                                Background="#FFFFF4DE"
-                                CornerRadius="8"
-                                Visibility="{Binding HasPendingRecovery, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <StackPanel>
-                                <TextBlock FontWeight="SemiBold"
-                                           Text="완료되지 않은 로그인 작업이 있습니다." />
-                                <TextBlock Margin="0,4,0,10"
-                                           TextWrapping="Wrap"
-                                           Text="새 프로필을 추가하기 전에 이전 인증 상태를 복구해야 합니다." />
-                                <Button x:Name="RecoveryButton"
-                                        MinWidth="190"
-                                        HorizontalAlignment="Left"
-                                        Click="RecoverPreviousLogin_Click"
-                                        Content="이전 로그인 작업 복구" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
+                    <TextBlock Grid.Row="0"
+                               Style="{StaticResource SectionTitleTextStyle}"
+                               Text="프로필" />
+                    <TextBlock Grid.Row="1"
+                               Margin="0,8,0,12"
+                               AutomationProperties.Name="{Binding ProfileStatusMessage}"
+                               Style="{StaticResource MutedTextStyle}"
+                               Text="{Binding ProfileStatusMessage}" />
+                    <ListBox Grid.Row="2"
+                             AutomationProperties.Name="프로필 목록"
+                             MinHeight="240"
+                             MaxHeight="360"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ItemsSource="{Binding Profiles}">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment"
+                                        Value="Stretch" />
+                                <Setter Property="Padding"
+                                        Value="0" />
+                                <Setter Property="Margin"
+                                        Value="0,0,0,10" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="16"
+                                        BorderBrush="{DynamicResource AppBrush.Border}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Background="{DynamicResource AppBrush.Surface}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background"
+                                                    Value="{DynamicResource AppBrush.Surface}" />
+                                            <Setter Property="BorderBrush"
+                                                    Value="{DynamicResource AppBrush.Border}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}"
+                                                             Value="True">
+                                                    <Setter Property="Background"
+                                                            Value="{DynamicResource AppBrush.SuccessSurface}" />
+                                                    <Setter Property="BorderBrush"
+                                                            Value="{DynamicResource AppBrush.SuccessBorder}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Row="1"
-                          Margin="0,20,0,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <DockPanel Grid.Row="0">
-                            <Button DockPanel.Dock="Right"
-                                    AutomationProperties.Name="새 프로필 추가"
-                                    MinWidth="116"
-                                    Padding="14,7"
-                                    Click="AddProfile_Click"
-                                    IsEnabled="{Binding CanAddProfile}"
-                                    Content="새 프로필 추가" />
-                            <TextBlock VerticalAlignment="Center"
-                                       FontSize="18"
-                                       FontWeight="SemiBold"
-                                       Text="프로필" />
-                        </DockPanel>
-                        <TextBlock Grid.Row="1"
-                                   Margin="0,8,0,10"
-                                   AutomationProperties.Name="{Binding ProfileStatusMessage}"
-                                   Foreground="#FF6B6B70"
-                                   Text="{Binding ProfileStatusMessage}"
-                                   TextWrapping="Wrap" />
-                        <ListBox Grid.Row="2"
-                                 AutomationProperties.Name="프로필 목록"
-                                 MinHeight="220"
-                                 MaxHeight="340"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                 ItemsSource="{Binding Profiles}">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Margin="2"
-                                            Padding="10"
-                                            CornerRadius="6">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background"
-                                                        Value="Transparent" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsActive}"
-                                                                 Value="True">
-                                                        <Setter Property="Background"
-                                                                Value="#FFE8F5EA" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <DockPanel>
-                                            <Menu DockPanel.Dock="Right"
-                                                  Margin="8,0,0,0"
-                                                  VerticalAlignment="Center"
-                                                  Background="Transparent">
-                                                <MenuItem Padding="10,5"
-                                                          AutomationProperties.Name="프로필 관리 메뉴"
-                                                          Header="관리">
-                                                    <MenuItem Header="삭제"
-                                                              AutomationProperties.Name="프로필 삭제"
-                                                              Click="DeleteProfile_Click"
-                                                              CommandParameter="{Binding}"
-                                                              IsEnabled="{Binding IsDeleteEnabled}" />
-                                                </MenuItem>
-                                            </Menu>
-                                            <Button DockPanel.Dock="Right"
-                                                    AutomationProperties.Name="{Binding ButtonText}"
-                                                    MinWidth="76"
-                                                    Padding="12,5"
-                                                    Click="RunProfile_Click"
-                                                    IsEnabled="{Binding IsRunEnabled}"
-                                                    Content="{Binding ButtonText}" />
-                                            <StackPanel>
-                                                <TextBlock FontSize="15"
-                                                           FontWeight="Medium"
-                                                           Text="{Binding Name}"
-                                                           TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Margin="0,3,0,0"
-                                                           Foreground="#FF3A7A44"
+                                        <StackPanel Grid.Column="0"
+                                                    Margin="0,0,16,0">
+                                            <TextBlock FontSize="16"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource AppBrush.Text}"
+                                                       Text="{Binding Name}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <Border Margin="0,8,0,0"
+                                                    Padding="9,4"
+                                                    HorizontalAlignment="Left"
+                                                    Background="{DynamicResource AppBrush.PillSurface}"
+                                                    CornerRadius="8">
+                                                <TextBlock FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource AppBrush.SuccessText}"
                                                            Text="{Binding Status}"
                                                            TextWrapping="Wrap" />
-                                            </StackPanel>
-                                        </DockPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Grid>
+                                            </Border>
+                                        </StackPanel>
+
+                                        <Button Grid.Column="1"
+                                                AutomationProperties.Name="{Binding ButtonText}"
+                                                MinWidth="86"
+                                                MinHeight="34"
+                                                Padding="14,5"
+                                                VerticalAlignment="Center"
+                                                Click="RunProfile_Click"
+                                                IsEnabled="{Binding IsRunEnabled}"
+                                                Content="{Binding ButtonText}" />
+                                        <Menu Grid.Column="2"
+                                              Margin="8,0,0,0"
+                                              VerticalAlignment="Center"
+                                              Background="Transparent">
+                                            <MenuItem Padding="10,5"
+                                                      AutomationProperties.Name="프로필 관리 메뉴"
+                                                      Header="관리">
+                                                <MenuItem Header="삭제"
+                                                          AutomationProperties.Name="프로필 삭제"
+                                                          Click="DeleteProfile_Click"
+                                                          CommandParameter="{Binding}"
+                                                          IsEnabled="{Binding IsDeleteEnabled}" />
+                                            </MenuItem>
+                                        </Menu>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </Grid>
-            </Border>
+            </Grid>
         </ScrollViewer>
     </Grid>
-</Window>
+</ui:FluentWindow>
