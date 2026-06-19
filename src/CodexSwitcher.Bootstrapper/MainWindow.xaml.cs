@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using CodexSwitcher.Bootstrapper.Presentation;
@@ -11,6 +12,7 @@ public partial class MainWindow : FluentWindow
     private readonly MainWindowViewModel _viewModel;
     private readonly CreateProfileLoginUseCase _profileLogin;
     private CancellationTokenSource? _monitorCancellation;
+    private bool _allowApplicationExit;
 
     public MainWindow(
         MainWindowViewModel viewModel,
@@ -31,6 +33,14 @@ public partial class MainWindow : FluentWindow
 
         _monitorCancellation = new CancellationTokenSource();
         _ = MonitorRuntimeAsync(_monitorCancellation.Token);
+    }
+
+    public bool IsOperationInProgress =>
+        _viewModel.IsOperationInProgress;
+
+    public void AllowApplicationExit()
+    {
+        _allowApplicationExit = true;
     }
 
     private async void AddProfile_Click(
@@ -205,6 +215,17 @@ public partial class MainWindow : FluentWindow
         _monitorCancellation?.Dispose();
         _monitorCancellation = null;
         base.OnClosed(e);
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (!_allowApplicationExit)
+        {
+            e.Cancel = true;
+            Hide();
+        }
+
+        base.OnClosing(e);
     }
 
     private async Task MonitorRuntimeAsync(

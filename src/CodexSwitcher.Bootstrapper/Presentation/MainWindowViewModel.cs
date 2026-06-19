@@ -94,6 +94,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         !_isOperationInProgress &&
         !HasPendingRecovery;
 
+    public bool IsOperationInProgress => _isOperationInProgress;
+
     public async Task InitializeAsync(
         CancellationToken cancellationToken)
     {
@@ -412,6 +414,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         _isOperationInProgress = value;
         OnPropertyChanged(nameof(CanAddProfile));
+        OnPropertyChanged(nameof(IsOperationInProgress));
     }
 
     private static string DescribeRunResult(RunProfileStatus status)
