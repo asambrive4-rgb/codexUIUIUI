@@ -13,7 +13,7 @@ public sealed class WindowsCodexRateLimitReader
     : IProfileRateLimitReader
 {
     private static readonly TimeSpan RequestTimeout =
-        TimeSpan.FromSeconds(8);
+        TimeSpan.FromSeconds(20);
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CurrentUserStorageAcl _storageAcl = new();
@@ -275,12 +275,20 @@ public sealed class WindowsCodexRateLimitReader
         _storageAcl.EnsureProtectedDirectory(_probeRoot);
         EnsureNotReparsePoint(_probeRoot);
 
-        foreach (var staleDirectory in Directory.EnumerateDirectories(
-                     _probeRoot,
-                     "*",
-                     SearchOption.TopDirectoryOnly))
+        try
         {
-            DeleteOwnedSessionDirectory(staleDirectory);
+            foreach (var staleDirectory in Directory.EnumerateDirectories(
+                         _probeRoot,
+                         "*",
+                         SearchOption.TopDirectoryOnly))
+            {
+                DeleteOwnedSessionDirectory(staleDirectory);
+            }
+        }
+        catch (Exception exception)
+            when (UsageProbeDirectoryCleaner
+                .IsRecoverableCleanupException(exception))
+        {
         }
 
         _probeRootPrepared = true;
@@ -434,40 +442,9 @@ public sealed class WindowsCodexRateLimitReader
 
     private void DeleteOwnedSessionDirectory(string path)
     {
-        if (!Directory.Exists(path))
-        {
-            return;
-        }
-
-        EnsureDirectChild(path);
-        EnsureNotReparsePoint(path);
-
-        foreach (var entry in Directory.EnumerateFileSystemEntries(
-                     path,
-                     "*",
-                     SearchOption.AllDirectories)
-                 .OrderByDescending(entry => entry.Length))
-        {
-            if ((File.GetAttributes(entry) &
-                 FileAttributes.ReparsePoint) != 0)
-            {
-                continue;
-            }
-
-            if (Directory.Exists(entry))
-            {
-                Directory.Delete(entry, recursive: false);
-            }
-            else
-            {
-                File.Delete(entry);
-            }
-        }
-
-        if (!Directory.EnumerateFileSystemEntries(path).Any())
-        {
-            Directory.Delete(path, recursive: false);
-        }
+        _ = UsageProbeDirectoryCleaner.TryDeleteSessionDirectory(
+            _probeRoot,
+            path);
     }
 
     private static void EnsureNotReparsePoint(string path)
@@ -705,7 +682,15 @@ public sealed class WindowsCodexRateLimitReader
                 _output.Dispose();
                 _process.Dispose();
                 CryptographicOperations.ZeroMemory(_credentialHash);
-                _deleteSessionDirectory(_sessionRoot);
+                try
+                {
+                    _deleteSessionDirectory(_sessionRoot);
+                }
+                catch (Exception exception)
+                    when (UsageProbeDirectoryCleaner
+                        .IsRecoverableCleanupException(exception))
+                {
+                }
             }
         }
 

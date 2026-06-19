@@ -16,7 +16,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly GetProfileRuntimeStateUseCase _getRuntimeState;
     private readonly ProfileListPresentationState _profileList = new();
     private readonly SemaphoreSlim _runtimeRefreshGate = new(1, 1);
-    private string _installationStatusMessage = "Codex 설치 확인 중...";
+    private string _installationStatusMessage = "확인 중";
     private string _profileStatusMessage = "프로필을 불러오는 중...";
     private string _runtimeStatusMessage = "Codex 상태 확인 중...";
     private string _operationStatusMessage = "";
@@ -116,10 +116,10 @@ public sealed class MainWindowViewModel : ObservableObject
         InstallationStatusMessage = result.Status switch
         {
             CodexInstallationDetectionStatus.Installed =>
-                "Codex 설치 확인됨",
+                "설치됨",
             CodexInstallationDetectionStatus.NotInstalled =>
-                "Codex를 찾지 못했습니다",
-            _ => "Codex 설치 확인 중 오류가 발생했습니다"
+                "미설치",
+            _ => "오류"
         };
 
         await RefreshProfilesAsync(cancellationToken);

@@ -59,7 +59,7 @@ public sealed class RateLimitWindowViewModel : ObservableObject
             RemainingPercent = 0;
             ProgressBrush = DeadBrush;
             DisplayText = $"{Label} · 정보 없음";
-            AutomationName = DisplayText;
+            AutomationName = $"{Label} · 정보 없음";
             return;
         }
 
@@ -75,22 +75,20 @@ public sealed class RateLimitWindowViewModel : ObservableObject
         var resetText = DescribeReset(window.ResetsAt);
         if (RemainingPercent == 0)
         {
-            DisplayText = $"{Label} · Dead · {resetText}";
-            AutomationName =
-                $"{Label} · 현재 사용 한도 소진 · {resetText}";
+            DisplayText = $"{Label} · 0% (소진) · {resetText}";
+            AutomationName = $"{Label} · 현재 사용 한도 소진 · {resetText}";
             return;
         }
 
-        DisplayText =
-            $"{Label} · {RemainingPercent}% 남음 · {resetText}";
-        AutomationName = DisplayText;
+        DisplayText = $"{Label} · {RemainingPercent}% · {resetText}";
+        AutomationName = $"{Label} · {RemainingPercent}% 남음 · 초기화: {resetText}";
     }
 
-    private static string DescribeReset(DateTimeOffset? resetsAt)
+    private string DescribeReset(DateTimeOffset? resetsAt)
     {
         if (resetsAt is null)
         {
-            return "초기화 시각 정보 없음";
+            return "정보 없음";
         }
 
         var remaining = resetsAt.Value - DateTimeOffset.Now;
@@ -99,16 +97,15 @@ public sealed class RateLimitWindowViewModel : ObservableObject
             return "곧 초기화";
         }
 
-        if (remaining < TimeSpan.FromDays(1))
+        var localTime = resetsAt.Value.ToLocalTime();
+        if (Label == "5시간 한도")
         {
-            var hours = (int)remaining.TotalHours;
-            var minutes = remaining.Minutes;
-            return hours > 0
-                ? $"{hours}시간 {minutes}분 후 초기화"
-                : $"{Math.Max(1, minutes)}분 후 초기화";
+            return localTime.ToString("HH:mm");
         }
-
-        return $"{resetsAt.Value.ToLocalTime():M월 d일 HH:mm} 초기화";
+        else
+        {
+            return localTime.ToString("M월 d일");
+        }
     }
 
     private static Brush CreateBrush(

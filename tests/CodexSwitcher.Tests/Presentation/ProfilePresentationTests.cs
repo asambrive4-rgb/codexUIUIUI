@@ -182,7 +182,7 @@ public sealed class ProfilePresentationTests
             brush.Color);
         if (remainingPercent == 0)
         {
-            StringAssert.Contains(viewModel.DisplayText, "Dead");
+            StringAssert.Contains(viewModel.DisplayText, "소진");
             StringAssert.Contains(
                 viewModel.AutomationName,
                 "현재 사용 한도 소진");

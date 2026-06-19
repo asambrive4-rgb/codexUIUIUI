@@ -75,12 +75,14 @@
                         HorizontalAlignment="Right"
                         Orientation="Horizontal">
                 <Button x:Name="CancelButton"
+                        Style="{StaticResource SecondaryButtonStyle}"
                         MinWidth="82"
                         MinHeight="34"
                         Padding="12,7"
                         Click="Cancel_Click"
                         Content="취소" />
                 <Button x:Name="StartButton"
+                        Style="{StaticResource AccentButtonStyle}"
                         Margin="8,0,0,0"
                         MinWidth="120"
                         MinHeight="34"
@@ -88,6 +90,7 @@
                         Click="Start_Click"
                         Content="생성 및 로그인" />
                 <Button x:Name="CompleteButton"
+                        Style="{StaticResource AccentButtonStyle}"
                         Margin="8,0,0,0"
                         MinWidth="110"
                         MinHeight="34"

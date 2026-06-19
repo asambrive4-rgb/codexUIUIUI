@@ -10,41 +10,191 @@
                 <ui:ControlsDictionary />
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- Global Typography Settings -->
+            <Style TargetType="{x:Type TextBlock}">
+                <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI, Pretendard, Malgun Gothic, sans-serif" />
+            </Style>
+            <Style TargetType="{x:Type Control}">
+                <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI, Pretendard, Malgun Gothic, sans-serif" />
+            </Style>
+
+            <!-- Modern Colors (AppBrush) -->
             <SolidColorBrush x:Key="AppBrush.WindowBackground"
-                             Color="#FFF4F8FA" />
+                             Color="#FFF8FAF9" />
             <SolidColorBrush x:Key="AppBrush.TitleBar"
-                             Color="#FFF8FBFC" />
+                             Color="#FFFFFFFF" />
             <SolidColorBrush x:Key="AppBrush.Surface"
                              Color="#FFFFFFFF" />
             <SolidColorBrush x:Key="AppBrush.SurfaceMuted"
-                             Color="#FFEFF5F5" />
+                             Color="#FFF1F5F5" />
             <SolidColorBrush x:Key="AppBrush.Border"
-                             Color="#FFDCE8E8" />
+                             Color="#FFE0E6E6" />
             <SolidColorBrush x:Key="AppBrush.Text"
-                             Color="#FF1E2729" />
+                             Color="#FF1E292B" />
             <SolidColorBrush x:Key="AppBrush.TextMuted"
-                             Color="#FF667276" />
+                             Color="#FF6A7B80" />
             <SolidColorBrush x:Key="AppBrush.Accent"
-                             Color="#FF2A8C83" />
+                             Color="#FF0D9488" />
             <SolidColorBrush x:Key="AppBrush.AccentMuted"
-                             Color="#FFDDF2EF" />
+                             Color="#FFCCFBEC" />
             <SolidColorBrush x:Key="AppBrush.InfoSurface"
-                             Color="#FFEAF6F7" />
+                             Color="#FFF0FDFA" />
             <SolidColorBrush x:Key="AppBrush.InfoText"
-                             Color="#FF23646A" />
+                             Color="#FF0F766E" />
             <SolidColorBrush x:Key="AppBrush.WarningSurface"
-                             Color="#FFFFF7E8" />
+                             Color="#FFFFFBEB" />
             <SolidColorBrush x:Key="AppBrush.WarningText"
-                             Color="#FF765118" />
+                             Color="#FFB45309" />
             <SolidColorBrush x:Key="AppBrush.SuccessSurface"
-                             Color="#FFF6FCFA" />
+                             Color="#FFF0FDF4" />
             <SolidColorBrush x:Key="AppBrush.SuccessBorder"
-                             Color="#FF9CCFC8" />
+                             Color="#FFBBF7D0" />
             <SolidColorBrush x:Key="AppBrush.SuccessText"
-                             Color="#FF247C73" />
+                             Color="#FF16A34A" />
             <SolidColorBrush x:Key="AppBrush.PillSurface"
-                             Color="#FFE8F3F2" />
+                             Color="#FFE2F3F0" />
 
+            <!-- Reusable Button Styles with micro-transitions -->
+            <!-- Base / Secondary Button Style -->
+            <Style x:Key="SecondaryButtonStyle" TargetType="{x:Type Button}">
+                <Setter Property="Background" Value="{DynamicResource AppBrush.Surface}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AppBrush.Border}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Foreground" Value="{DynamicResource AppBrush.Text}" />
+                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type Button}">
+                            <Border x:Name="border"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6"
+                                    SnapsToDevicePixels="true">
+                                <ContentPresenter x:Name="contentPresenter"
+                                                  Focusable="False"
+                                                  HorizontalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}"
+                                                  RecognizesAccessKey="True"
+                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="true">
+                                    <Setter TargetName="border" Property="Background" Value="{DynamicResource AppBrush.SurfaceMuted}" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AppBrush.Accent}" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="true">
+                                    <Setter TargetName="border" Property="Background" Value="{DynamicResource AppBrush.Border}" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="false">
+                                    <Setter TargetName="border" Property="Background" Value="{DynamicResource AppBrush.SurfaceMuted}" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AppBrush.Border}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource AppBrush.TextMuted}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Default style mappings so standard Buttons are styled automatically -->
+            <Style TargetType="{x:Type Button}" BasedOn="{StaticResource SecondaryButtonStyle}" />
+
+            <!-- Accent Button Style (Primary Actions) -->
+            <Style x:Key="AccentButtonStyle" TargetType="{x:Type Button}">
+                <Setter Property="Background" Value="{DynamicResource AppBrush.Accent}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AppBrush.Accent}" />
+                <Setter Property="Foreground" Value="White" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type Button}">
+                            <Border x:Name="border"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6"
+                                    SnapsToDevicePixels="true">
+                                <ContentPresenter x:Name="contentPresenter"
+                                                  Focusable="False"
+                                                  HorizontalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}"
+                                                  RecognizesAccessKey="True"
+                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="true">
+                                    <Setter TargetName="border" Property="Background" Value="#FF0F8276" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#FF0F8276" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="true">
+                                    <Setter TargetName="border" Property="Background" Value="#FF0B645B" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#FF0B645B" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="false">
+                                    <Setter TargetName="border" Property="Background" Value="{DynamicResource AppBrush.Border}" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AppBrush.Border}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource AppBrush.TextMuted}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Danger Button Style (Destructive Actions) -->
+            <Style x:Key="DangerButtonStyle" TargetType="{x:Type Button}">
+                <Setter Property="Background" Value="#FFFEF2F2" />
+                <Setter Property="BorderBrush" Value="#FFFEE2E2" />
+                <Setter Property="Foreground" Value="#FEF00000" /> <!-- Dark Red -->
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type Button}">
+                            <Border x:Name="border"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6"
+                                    SnapsToDevicePixels="true">
+                                <ContentPresenter x:Name="contentPresenter"
+                                                  Focusable="False"
+                                                  HorizontalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}"
+                                                  RecognizesAccessKey="True"
+                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="true">
+                                    <Setter TargetName="border" Property="Background" Value="#FFFEE2E2" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#FFEF4444" />
+                                    <Setter Property="Foreground" Value="#FFB91C1C" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="true">
+                                    <Setter TargetName="border" Property="Background" Value="#FFFCA5A5" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#FFB91C1C" />
+                                    <Setter Property="Foreground" Value="#FF7F1D1D" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="false">
+                                    <Setter TargetName="border" Property="Background" Value="{DynamicResource AppBrush.SurfaceMuted}" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AppBrush.Border}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource AppBrush.TextMuted}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Text Styles -->
             <Style x:Key="TitleBarCaptionTextStyle"
                    TargetType="TextBlock">
                 <Setter Property="FontSize"
@@ -76,7 +226,7 @@
                 <Setter Property="FontSize"
                         Value="28" />
                 <Setter Property="FontWeight"
-                        Value="SemiBold" />
+                        Value="Bold" />
                 <Setter Property="Foreground"
                         Value="{DynamicResource AppBrush.Text}" />
             </Style>
@@ -86,7 +236,7 @@
                 <Setter Property="FontSize"
                         Value="18" />
                 <Setter Property="FontWeight"
-                        Value="SemiBold" />
+                        Value="Bold" />
                 <Setter Property="Foreground"
                         Value="{DynamicResource AppBrush.Text}" />
             </Style>
@@ -97,8 +247,11 @@
                         Value="{DynamicResource AppBrush.TextMuted}" />
                 <Setter Property="TextWrapping"
                         Value="Wrap" />
+                <Setter Property="LineHeight"
+                        Value="18" />
             </Style>
 
+            <!-- Layout Panel Styles -->
             <Style x:Key="StatusPanelStyle"
                    TargetType="Border">
                 <Setter Property="Padding"
