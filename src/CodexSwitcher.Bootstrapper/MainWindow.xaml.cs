@@ -235,6 +235,21 @@ public partial class MainWindow : FluentWindow
             CancellationToken.None);
     }
 
+    private void ManageButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element)
+        {
+            if (element.ContextMenu != null)
+            {
+                element.ContextMenu.PlacementTarget = element;
+                element.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                element.ContextMenu.IsOpen = true;
+            }
+        }
+    }
+
     private bool ConfirmForceClose()
     {
         return MessageBox.Show(

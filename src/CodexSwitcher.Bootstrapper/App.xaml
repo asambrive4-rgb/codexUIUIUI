@@ -12,10 +12,14 @@
 
             <!-- Global Typography Settings -->
             <Style TargetType="{x:Type TextBlock}">
-                <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI, Pretendard, Malgun Gothic, sans-serif" />
+                <Setter Property="FontFamily" Value="Pretendard, Segoe UI Variable Text, Segoe UI, Malgun Gothic, sans-serif" />
+                <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+                <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
             </Style>
             <Style TargetType="{x:Type Control}">
-                <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI, Pretendard, Malgun Gothic, sans-serif" />
+                <Setter Property="FontFamily" Value="Pretendard, Segoe UI Variable Text, Segoe UI, Malgun Gothic, sans-serif" />
+                <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+                <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
             </Style>
 
             <!-- Modern Colors (AppBrush) -->

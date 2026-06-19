@@ -75,7 +75,7 @@ public sealed class RateLimitWindowViewModel : ObservableObject
         var resetText = DescribeReset(window.ResetsAt);
         if (RemainingPercent == 0)
         {
-            DisplayText = $"{Label} · 0% (소진) · {resetText}";
+            DisplayText = $"{Label} · 0% · {resetText}";
             AutomationName = $"{Label} · 현재 사용 한도 소진 · {resetText}";
             return;
         }

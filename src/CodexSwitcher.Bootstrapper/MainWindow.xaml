@@ -180,15 +180,19 @@
                                 </TextBlock>
                             </Border>
                         </StackPanel>
-                        <Button Grid.Column="1"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                MinWidth="104"
-                                MinHeight="32"
-                                Padding="12,4"
-                                AutomationProperties.Name="전체 계정 사용량 새로고침"
-                                Click="UsageRefresh_Click"
-                                Content="사용량 새로고침"
-                                IsEnabled="{Binding CanRefreshUsage}" />
+                        <ui:Button Grid.Column="1"
+                                   Appearance="Secondary"
+                                   MinWidth="110"
+                                   MinHeight="32"
+                                   Padding="10,4"
+                                   AutomationProperties.Name="전체 계정 사용량 새로고침"
+                                   Click="UsageRefresh_Click"
+                                   IsEnabled="{Binding CanRefreshUsage}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="ArrowClockwise24" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                <TextBlock Text="사용량 새로고침" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ui:Button>
                     </Grid>
                     <ListBox Grid.Row="1"
                              AutomationProperties.Name="프로필 목록"
@@ -210,7 +214,7 @@
                                 <Setter Property="Padding"
                                         Value="0" />
                                 <Setter Property="Margin"
-                                        Value="4" />
+                                        Value="6" />
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
@@ -232,11 +236,20 @@
                                                 <DataTrigger Binding="{Binding IsActive}"
                                                              Value="True">
                                                     <Setter Property="Background"
-                                                            Value="{DynamicResource AppBrush.SuccessSurface}" />
+                                                            Value="{DynamicResource AppBrush.AccentMuted}" />
                                                     <Setter Property="BorderBrush"
-                                                            Value="{DynamicResource AppBrush.SuccessBorder}" />
+                                                            Value="{DynamicResource AppBrush.Accent}" />
                                                     <Setter Property="BorderThickness"
-                                                            Value="2" />
+                                                            Value="6,2,2,2" />
+                                                    <Setter Property="Effect">
+                                                        <Setter.Value>
+                                                            <DropShadowEffect Color="#FF0D9488"
+                                                                              BlurRadius="14"
+                                                                              ShadowDepth="1"
+                                                                              Opacity="0.25"
+                                                                              RenderingBias="Performance" />
+                                                        </Setter.Value>
+                                                    </Setter>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -286,21 +299,31 @@
                                                 IsEnabled="{Binding IsRunEnabled}"
                                                 Content="{Binding ButtonText}" />
 
-                                        <Menu Grid.Row="1"
-                                              Grid.Column="1"
-                                              Margin="8,0,0,0"
-                                              VerticalAlignment="Center"
-                                              Background="Transparent">
-                                            <MenuItem Padding="8,4"
-                                                      AutomationProperties.Name="프로필 관리 메뉴"
-                                                      Header="관리">
-                                                <MenuItem Header="삭제"
-                                                          AutomationProperties.Name="프로필 삭제"
-                                                          Click="DeleteProfile_Click"
-                                                          CommandParameter="{Binding}"
-                                                          IsEnabled="{Binding IsDeleteEnabled}" />
-                                            </MenuItem>
-                                        </Menu>
+                                        <ui:Button Grid.Row="1"
+                                                   Grid.Column="1"
+                                                   Margin="8,0,0,0"
+                                                   Padding="10,4"
+                                                   VerticalAlignment="Center"
+                                                   Appearance="Secondary"
+                                                   Click="ManageButton_Click">
+                                            <ui:Button.ContextMenu>
+                                                <ContextMenu x:Name="ProfileContextMenu" 
+                                                             DataContext="{Binding Path=PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                                    <MenuItem Header="삭제"
+                                                              Click="DeleteProfile_Click"
+                                                              CommandParameter="{Binding}"
+                                                              IsEnabled="{Binding IsDeleteEnabled}">
+                                                        <MenuItem.Icon>
+                                                            <ui:SymbolIcon Symbol="Delete24" Foreground="#FFEF4444" />
+                                                        </MenuItem.Icon>
+                                                    </MenuItem>
+                                                </ContextMenu>
+                                            </ui:Button.ContextMenu>
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:SymbolIcon Symbol="Settings24" Margin="0,0,5,0" VerticalAlignment="Center" />
+                                                <TextBlock Text="관리" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </ui:Button>
 
                                         <StackPanel Grid.Row="2"
                                                     Grid.Column="0"
