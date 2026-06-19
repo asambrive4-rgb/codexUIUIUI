@@ -1,10 +1,13 @@
 using System.ComponentModel;
 using System.Windows;
 using CodexSwitcher.Bootstrapper.Presentation;
+using CodexSwitcher.Bootstrapper.Usage;
 using CodexSwitcher.Core.Installation;
 using CodexSwitcher.Core.Profiles;
+using CodexSwitcher.Core.Usage;
 using CodexSwitcher.Infrastructure.Installation;
 using CodexSwitcher.Infrastructure.Profiles;
+using CodexSwitcher.Infrastructure.Usage;
 
 namespace CodexSwitcher.Bootstrapper;
 
@@ -13,6 +16,7 @@ public partial class App : Application
     private SingleInstanceCoordinator? _singleInstance;
     private TrayIconService? _trayIcon;
     private MainWindowViewModel? _viewModel;
+    private ProfileUsageMonitor? _usageMonitor;
     private bool _isExiting;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -67,6 +71,18 @@ public partial class App : Application
                 profileStore,
                 authenticationSession,
                 codexController);
+        var rateLimitReader =
+            new WindowsCodexRateLimitReader();
+        var refreshProfileRateLimit =
+            new RefreshProfileRateLimitUseCase(
+                profileStore,
+                rateLimitReader,
+                operationCoordinator);
+        var usageMonitor = new ProfileUsageMonitor(
+            listProfiles,
+            getRuntimeState,
+            refreshProfileRateLimit,
+            rateLimitReader);
         var viewModel = new MainWindowViewModel(
             detectInstallation,
             listProfiles,
@@ -75,9 +91,13 @@ public partial class App : Application
             switchProfile,
             deleteProfile,
             getRuntimeState);
-        var window = new MainWindow(viewModel, profileLogin);
+        var window = new MainWindow(
+            viewModel,
+            profileLogin,
+            usageMonitor);
 
         _viewModel = viewModel;
+        _usageMonitor = usageMonitor;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         MainWindow = window;
@@ -92,6 +112,7 @@ public partial class App : Application
 
         await viewModel.InitializeAsync(CancellationToken.None);
         window.StartRuntimeMonitoring();
+        window.StartUsageMonitoring();
     }
 
     protected override void OnSessionEnding(
@@ -111,6 +132,8 @@ public partial class App : Application
 
         _trayIcon?.Dispose();
         _trayIcon = null;
+        _usageMonitor?.Dispose();
+        _usageMonitor = null;
         _singleInstance?.Dispose();
         _singleInstance = null;
 

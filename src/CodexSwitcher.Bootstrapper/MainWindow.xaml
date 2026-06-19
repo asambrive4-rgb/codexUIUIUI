@@ -86,49 +86,26 @@
                                Text="Codex 계정 프로필을 선택해 실행하거나 전환하세요. 로그인 정보는 이 PC에만 보관됩니다." />
                 </Border>
 
-                <Grid Grid.Row="1"
-                      Margin="0,14,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <Border Grid.Column="0"
-                            Style="{StaticResource StatusPanelStyle}">
-                        <StackPanel>
-                            <TextBlock FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AppBrush.TextMuted}"
-                                       Text="설치 상태" />
-                            <TextBlock Margin="0,6,0,0"
-                                       AutomationProperties.Name="{Binding InstallationStatusMessage}"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AppBrush.Text}"
-                                       Text="{Binding InstallationStatusMessage}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border Grid.Column="2"
-                            Style="{StaticResource StatusPanelStyle}"
-                            Background="{DynamicResource AppBrush.InfoSurface}">
-                        <StackPanel>
-                            <TextBlock FontSize="12"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AppBrush.InfoText}"
-                                       Text="실행 상태" />
-                            <TextBlock Margin="0,6,0,0"
-                                       AutomationProperties.Name="{Binding RuntimeStatusMessage}"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AppBrush.InfoText}"
-                                       Text="{Binding RuntimeStatusMessage}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
+                <Border Grid.Row="1"
+                        Margin="0,14,0,0"
+                        Padding="16,10"
+                        Style="{StaticResource StatusPanelStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppBrush.TextMuted}"
+                                   VerticalAlignment="Center"
+                                   Text="설치 상태" />
+                        <TextBlock Margin="12,0,0,0"
+                                   AutomationProperties.Name="{Binding InstallationStatusMessage}"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppBrush.Text}"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding InstallationStatusMessage}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
 
                 <StackPanel Grid.Row="2"
                             Margin="0,12,0,0">
@@ -167,9 +144,23 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0"
-                               Style="{StaticResource SectionTitleTextStyle}"
-                               Text="프로필" />
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Style="{StaticResource SectionTitleTextStyle}"
+                                   Text="프로필" />
+                        <Button Grid.Column="1"
+                                MinWidth="104"
+                                MinHeight="32"
+                                Padding="12,4"
+                                AutomationProperties.Name="전체 계정 사용량 새로고침"
+                                Click="UsageRefresh_Click"
+                                Content="사용량 새로고침"
+                                IsEnabled="{Binding CanRefreshUsage}" />
+                    </Grid>
                     <TextBlock Grid.Row="1"
                                Margin="0,8,0,12"
                                AutomationProperties.Name="{Binding ProfileStatusMessage}"
@@ -218,13 +209,18 @@
                                         </Style>
                                     </Border.Style>
                                     <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
-                                        <StackPanel Grid.Column="0"
+                                        <StackPanel Grid.Row="0"
+                                                    Grid.Column="0"
                                                     Margin="0,0,16,0">
                                             <TextBlock FontSize="16"
                                                        FontWeight="SemiBold"
@@ -244,7 +240,8 @@
                                             </Border>
                                         </StackPanel>
 
-                                        <Button Grid.Column="1"
+                                        <Button Grid.Row="0"
+                                                Grid.Column="1"
                                                 AutomationProperties.Name="{Binding ButtonText}"
                                                 MinWidth="86"
                                                 MinHeight="34"
@@ -253,7 +250,8 @@
                                                 Click="RunProfile_Click"
                                                 IsEnabled="{Binding IsRunEnabled}"
                                                 Content="{Binding ButtonText}" />
-                                        <Menu Grid.Column="2"
+                                        <Menu Grid.Row="0"
+                                              Grid.Column="2"
                                               Margin="8,0,0,0"
                                               VerticalAlignment="Center"
                                               Background="Transparent">
@@ -267,6 +265,45 @@
                                                           IsEnabled="{Binding IsDeleteEnabled}" />
                                             </MenuItem>
                                         </Menu>
+
+                                        <StackPanel Grid.Row="1"
+                                                    Grid.Column="0"
+                                                    Grid.ColumnSpan="3"
+                                                    Margin="0,14,0,0">
+                                            <StackPanel Visibility="{Binding HasUsageData, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                <TextBlock AutomationProperties.Name="{Binding FiveHourUsage.AutomationName}"
+                                                           FontSize="12"
+                                                           Foreground="{DynamicResource AppBrush.TextMuted}"
+                                                           Text="{Binding FiveHourUsage.DisplayText}" />
+                                                <ProgressBar Height="6"
+                                                             Margin="0,5,0,10"
+                                                             Maximum="100"
+                                                             Background="{DynamicResource AppBrush.SurfaceMuted}"
+                                                             BorderThickness="0"
+                                                             Foreground="{Binding FiveHourUsage.ProgressBrush}"
+                                                             IsHitTestVisible="False"
+                                                             Value="{Binding FiveHourUsage.RemainingPercent, Mode=OneWay}" />
+                                                <TextBlock AutomationProperties.Name="{Binding WeeklyUsage.AutomationName}"
+                                                           FontSize="12"
+                                                           Foreground="{DynamicResource AppBrush.TextMuted}"
+                                                           Text="{Binding WeeklyUsage.DisplayText}" />
+                                                <ProgressBar Height="6"
+                                                             Margin="0,5,0,0"
+                                                             Maximum="100"
+                                                             Background="{DynamicResource AppBrush.SurfaceMuted}"
+                                                             BorderThickness="0"
+                                                             Foreground="{Binding WeeklyUsage.ProgressBrush}"
+                                                             IsHitTestVisible="False"
+                                                             Value="{Binding WeeklyUsage.RemainingPercent, Mode=OneWay}" />
+                                            </StackPanel>
+                                            <TextBlock Margin="0,8,0,0"
+                                                       AutomationProperties.Name="{Binding UsageStatusMessage}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource AppBrush.TextMuted}"
+                                                       Text="{Binding UsageStatusMessage}"
+                                                       TextWrapping="Wrap"
+                                                       Visibility="{Binding HasUsageStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
                             </DataTemplate>

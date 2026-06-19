@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using CodexSwitcher.Bootstrapper.Presentation;
+using CodexSwitcher.Bootstrapper.Usage;
 using CodexSwitcher.Core.Profiles;
+using CodexSwitcher.Core.Usage;
 using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 
 namespace CodexSwitcher.Bootstrapper;
@@ -11,17 +13,23 @@ public partial class MainWindow : FluentWindow
 {
     private readonly MainWindowViewModel _viewModel;
     private readonly CreateProfileLoginUseCase _profileLogin;
+    private readonly ProfileUsageMonitor _usageMonitor;
     private CancellationTokenSource? _monitorCancellation;
+    private IDisposable? _usageSurfaceLease;
+    private bool _usageMonitoringStarted;
     private bool _allowApplicationExit;
 
     public MainWindow(
         MainWindowViewModel viewModel,
-        CreateProfileLoginUseCase profileLogin)
+        CreateProfileLoginUseCase profileLogin,
+        ProfileUsageMonitor usageMonitor)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _profileLogin = profileLogin;
+        _usageMonitor = usageMonitor;
         DataContext = viewModel;
+        IsVisibleChanged += MainWindow_IsVisibleChanged;
     }
 
     public void StartRuntimeMonitoring()
@@ -33,6 +41,19 @@ public partial class MainWindow : FluentWindow
 
         _monitorCancellation = new CancellationTokenSource();
         _ = MonitorRuntimeAsync(_monitorCancellation.Token);
+    }
+
+    public void StartUsageMonitoring()
+    {
+        if (_usageMonitoringStarted)
+        {
+            return;
+        }
+
+        _usageMonitoringStarted = true;
+        _usageMonitor.SnapshotChanged += OnUsageSnapshotChanged;
+        _usageMonitor.RefreshingChanged += OnUsageRefreshingChanged;
+        UpdateUsageSurfaceRegistration();
     }
 
     public bool IsOperationInProgress =>
@@ -58,6 +79,8 @@ public partial class MainWindow : FluentWindow
             return;
         }
 
+        using var pause = await _usageMonitor.PauseAsync(
+            CancellationToken.None);
         var window = new NewProfileWindow(_profileLogin)
         {
             Owner = this
@@ -82,6 +105,8 @@ public partial class MainWindow : FluentWindow
             return;
         }
 
+        using var pause = await _usageMonitor.PauseAsync(
+            CancellationToken.None);
         if (!profile.IsSwitchAction)
         {
             await _viewModel.RunProfileAsync(
@@ -111,7 +136,7 @@ public partial class MainWindow : FluentWindow
         {
             MessageBox.Show(
                 this,
-                MainWindowViewModel.DescribeDeleteResult(
+                ProfileOperationMessageFormatter.Describe(
                     DeleteProfileStatus.ActiveProfileBlocked),
                 "프로필 삭제",
                 MessageBoxButton.OK,
@@ -130,6 +155,8 @@ public partial class MainWindow : FluentWindow
             return;
         }
 
+        using var pause = await _usageMonitor.PauseAsync(
+            CancellationToken.None);
         var result = await _viewModel.DeleteProfileAsync(
             profile.Id,
             CancellationToken.None);
@@ -140,7 +167,7 @@ public partial class MainWindow : FluentWindow
 
         MessageBox.Show(
             this,
-            MainWindowViewModel.DescribeDeleteResult(result.Status),
+            ProfileOperationMessageFormatter.Describe(result.Status),
             "프로필 삭제",
             MessageBoxButton.OK,
             result.Status == DeleteProfileStatus.Failed
@@ -155,6 +182,8 @@ public partial class MainWindow : FluentWindow
         RecoveryButton.IsEnabled = false;
         try
         {
+            using var pause = await _usageMonitor.PauseAsync(
+                CancellationToken.None);
             var result = await _profileLogin.CancelAsync(
                 forceCloseApproved: false,
                 CancellationToken.None);
@@ -198,6 +227,14 @@ public partial class MainWindow : FluentWindow
         }
     }
 
+    private async void UsageRefresh_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        await _usageMonitor.RefreshAllNowAsync(
+            CancellationToken.None);
+    }
+
     private bool ConfirmForceClose()
     {
         return MessageBox.Show(
@@ -211,6 +248,11 @@ public partial class MainWindow : FluentWindow
 
     protected override void OnClosed(EventArgs e)
     {
+        IsVisibleChanged -= MainWindow_IsVisibleChanged;
+        _usageMonitor.SnapshotChanged -= OnUsageSnapshotChanged;
+        _usageMonitor.RefreshingChanged -= OnUsageRefreshingChanged;
+        _usageSurfaceLease?.Dispose();
+        _usageSurfaceLease = null;
         _monitorCancellation?.Cancel();
         _monitorCancellation?.Dispose();
         _monitorCancellation = null;
@@ -226,6 +268,47 @@ public partial class MainWindow : FluentWindow
         }
 
         base.OnClosing(e);
+    }
+
+    private void MainWindow_IsVisibleChanged(
+        object sender,
+        DependencyPropertyChangedEventArgs e)
+    {
+        UpdateUsageSurfaceRegistration();
+    }
+
+    private void UpdateUsageSurfaceRegistration()
+    {
+        if (!_usageMonitoringStarted)
+        {
+            return;
+        }
+
+        if (IsVisible)
+        {
+            _usageSurfaceLease ??=
+                _usageMonitor.AcquireVisibleSurface();
+            return;
+        }
+
+        _usageSurfaceLease?.Dispose();
+        _usageSurfaceLease = null;
+    }
+
+    private void OnUsageSnapshotChanged(
+        object? sender,
+        ProfileRateLimitSnapshot snapshot)
+    {
+        _ = Dispatcher.InvokeAsync(
+            () => _viewModel.ApplyUsageSnapshot(snapshot));
+    }
+
+    private void OnUsageRefreshingChanged(
+        object? sender,
+        bool isRefreshing)
+    {
+        _ = Dispatcher.InvokeAsync(
+            () => _viewModel.SetUsageRefreshing(isRefreshing));
     }
 
     private async Task MonitorRuntimeAsync(

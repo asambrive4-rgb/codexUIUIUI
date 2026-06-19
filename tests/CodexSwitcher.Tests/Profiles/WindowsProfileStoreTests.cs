@@ -69,6 +69,38 @@ public sealed class WindowsProfileStoreTests
     }
 
     [TestMethod]
+    public async Task ReplaceCredential_UpdatesOnlySelectedCredential()
+    {
+        var first = CreateProfile("First");
+        var second = CreateProfile("Second");
+        var store = new WindowsProfileStore(_storageRoot);
+        await store.SaveAsync(
+            first,
+            "first-old"u8.ToArray(),
+            CancellationToken.None);
+        await store.SaveAsync(
+            second,
+            "second"u8.ToArray(),
+            CancellationToken.None);
+
+        await store.ReplaceCredentialAsync(
+            first.Id,
+            "first-new"u8.ToArray(),
+            CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            "first-new"u8.ToArray(),
+            await store.ReadCredentialAsync(
+                first.Id,
+                CancellationToken.None));
+        CollectionAssert.AreEqual(
+            "second"u8.ToArray(),
+            await store.ReadCredentialAsync(
+                second.Id,
+                CancellationToken.None));
+    }
+
+    [TestMethod]
     public async Task ReadAll_WithValidAndCorruptProfiles_ReturnsPartialResult()
     {
         var valid = CreateProfile("Valid");

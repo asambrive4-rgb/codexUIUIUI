@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
     <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -13,12 +14,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\CodexSwitcher.Bootstrapper\CodexSwitcher.Bootstrapper.csproj" />
     <ProjectReference Include="..\..\src\CodexSwitcher.Core\CodexSwitcher.Core.csproj" />
     <ProjectReference Include="..\..\src\CodexSwitcher.Infrastructure\CodexSwitcher.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+    <Using Include="System.IO" />
   </ItemGroup>
 
 </Project>

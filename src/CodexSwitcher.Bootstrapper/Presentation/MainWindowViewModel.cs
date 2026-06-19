@@ -1,12 +1,11 @@
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using CodexSwitcher.Core.Installation;
 using CodexSwitcher.Core.Profiles;
+using CodexSwitcher.Core.Usage;
 
 namespace CodexSwitcher.Bootstrapper.Presentation;
 
-public sealed class MainWindowViewModel : INotifyPropertyChanged
+public sealed class MainWindowViewModel : ObservableObject
 {
     private readonly DetectCodexInstallationUseCase _detectInstallation;
     private readonly ListProfilesUseCase _listProfiles;
@@ -15,6 +14,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly SwitchProfileUseCase _switchProfile;
     private readonly DeleteProfileUseCase _deleteProfile;
     private readonly GetProfileRuntimeStateUseCase _getRuntimeState;
+    private readonly ProfileListPresentationState _profileList = new();
     private readonly SemaphoreSlim _runtimeRefreshGate = new(1, 1);
     private string _installationStatusMessage = "Codex 설치 확인 중...";
     private string _profileStatusMessage = "프로필을 불러오는 중...";
@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private string _operationStatusMessage = "";
     private bool _hasPendingRecovery;
     private bool _isOperationInProgress;
+    private bool _isUsageRefreshing;
 
     public MainWindowViewModel(
         DetectCodexInstallationUseCase detectInstallation,
@@ -41,41 +42,31 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _getRuntimeState = getRuntimeState;
     }
 
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    public ObservableCollection<ProfileListItemViewModel> Profiles { get; } =
-        [];
+    public ObservableCollection<ProfileListItemViewModel> Profiles =>
+        _profileList.Profiles;
 
     public string InstallationStatusMessage
     {
         get => _installationStatusMessage;
-        private set => SetField(
-            ref _installationStatusMessage,
-            value);
+        private set => SetField(ref _installationStatusMessage, value);
     }
 
     public string ProfileStatusMessage
     {
         get => _profileStatusMessage;
-        private set => SetField(
-            ref _profileStatusMessage,
-            value);
+        private set => SetField(ref _profileStatusMessage, value);
     }
 
     public string RuntimeStatusMessage
     {
         get => _runtimeStatusMessage;
-        private set => SetField(
-            ref _runtimeStatusMessage,
-            value);
+        private set => SetField(ref _runtimeStatusMessage, value);
     }
 
     public string OperationStatusMessage
     {
         get => _operationStatusMessage;
-        private set => SetField(
-            ref _operationStatusMessage,
-            value);
+        private set => SetField(ref _operationStatusMessage, value);
     }
 
     public bool HasPendingRecovery
@@ -95,6 +86,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         !HasPendingRecovery;
 
     public bool IsOperationInProgress => _isOperationInProgress;
+
+    public bool IsUsageRefreshing
+    {
+        get => _isUsageRefreshing;
+        private set
+        {
+            if (SetField(ref _isUsageRefreshing, value))
+            {
+                OnPropertyChanged(nameof(CanRefreshUsage));
+            }
+        }
+    }
+
+    public bool CanRefreshUsage => !IsUsageRefreshing;
+
+    public void SetUsageRefreshing(bool value) =>
+        IsUsageRefreshing = value;
+
+    public void ApplyUsageSnapshot(
+        ProfileRateLimitSnapshot snapshot) =>
+        _profileList.ApplyUsageSnapshot(snapshot);
 
     public async Task InitializeAsync(
         CancellationToken cancellationToken)
@@ -118,16 +130,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         var result = await _listProfiles.ExecuteAsync(
             cancellationToken);
-        Profiles.Clear();
-
-        foreach (var profile in result.Profiles)
-        {
-            Profiles.Add(
-                new ProfileListItemViewModel(
-                    profile.Id,
-                    profile.Name.Value));
-        }
-
+        _profileList.Replace(result.Profiles);
         ProfileStatusMessage = result.Issues.Count > 0
             ? "일부 프로필 저장 데이터를 읽지 못했습니다. 새 프로필 추가 전에 저장소 확인이 필요합니다."
             : result.Profiles.Count == 0
@@ -158,7 +161,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                     cancellationToken);
             var state = await _getRuntimeState.ExecuteAsync(
                 cancellationToken);
-            ApplyRuntimeState(state);
+            RuntimeStatusMessage = _profileList.ApplyRuntimeState(
+                state,
+                CanOperateOnProfiles);
         }
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
@@ -169,8 +174,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             RuntimeStatusMessage =
                 "Codex 상태를 확인하지 못했습니다.";
-            DisableAllRunButtons();
-            DisableAllDeleteButtons();
+            _profileList.DisableAllActions();
         }
         finally
         {
@@ -178,35 +182,79 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public async Task<RunProfileResult> RunProfileAsync(
+    public Task<RunProfileResult> RunProfileAsync(
         ProfileId profileId,
+        CancellationToken cancellationToken) =>
+        ExecuteProfileOperationAsync(
+            profileId,
+            "실행 중...",
+            "선택한 프로필로 Codex 실행 중...",
+            new RunProfileResult(RunProfileStatus.Failed),
+            _runProfile.ExecuteAsync,
+            result =>
+                ProfileOperationMessageFormatter.Describe(result.Status),
+            (_, token) => RefreshRuntimeStateAsync(token),
+            cancellationToken);
+
+    public Task<SwitchProfileResult> SwitchProfileAsync(
+        ProfileId profileId,
+        CancellationToken cancellationToken) =>
+        ExecuteProfileOperationAsync(
+            profileId,
+            "전환 중...",
+            "선택한 프로필로 Codex 전환 중...",
+            new SwitchProfileResult(SwitchProfileStatus.Failed),
+            _switchProfile.ExecuteAsync,
+            result =>
+                ProfileOperationMessageFormatter.Describe(result.Status),
+            (_, token) => RefreshRuntimeStateAsync(token),
+            cancellationToken);
+
+    public Task<DeleteProfileResult> DeleteProfileAsync(
+        ProfileId profileId,
+        CancellationToken cancellationToken) =>
+        ExecuteProfileOperationAsync(
+            profileId,
+            "삭제 중...",
+            "선택한 프로필 삭제 중...",
+            new DeleteProfileResult(DeleteProfileStatus.Failed),
+            _deleteProfile.ExecuteAsync,
+            result =>
+                ProfileOperationMessageFormatter.Describe(result.Status),
+            (result, token) =>
+                result.Status == DeleteProfileStatus.Deleted
+                    ? RefreshProfilesAsync(token)
+                    : RefreshRuntimeStateAsync(token),
+            cancellationToken);
+
+    private bool CanOperateOnProfiles =>
+        !HasPendingRecovery &&
+        !_isOperationInProgress;
+
+    private async Task<TResult> ExecuteProfileOperationAsync<TResult>(
+        ProfileId profileId,
+        string itemStatus,
+        string operationStatus,
+        TResult busyResult,
+        Func<ProfileId, CancellationToken, Task<TResult>> execute,
+        Func<TResult, string> describeResult,
+        Func<TResult, CancellationToken, Task> refreshAfter,
         CancellationToken cancellationToken)
     {
         if (_isOperationInProgress)
         {
-            return new RunProfileResult(
-                RunProfileStatus.Failed);
+            return busyResult;
         }
 
         SetOperationInProgress(true);
-        var target = Profiles.FirstOrDefault(
-            profile => profile.Id == profileId);
-        if (target is not null)
-        {
-            target.Status = "실행 중...";
-        }
+        _profileList.BeginOperation(profileId, itemStatus);
+        OperationStatusMessage = operationStatus;
 
-        OperationStatusMessage = "선택한 프로필로 Codex 실행 중...";
-        DisableAllRunButtons();
-        DisableAllDeleteButtons();
-
-        RunProfileResult result;
+        TResult result;
         try
         {
-            result = await _runProfile.ExecuteAsync(
-                profileId,
-                cancellationToken);
-            OperationStatusMessage = DescribeRunResult(result.Status);
+            result = await execute(profileId, cancellationToken);
+            OperationStatusMessage = describeResult(result);
         }
         finally
         {
@@ -216,193 +264,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         HasPendingRecovery =
             await _profileLogin.HasPendingRecoveryAsync(
                 cancellationToken);
-        await RefreshRuntimeStateAsync(cancellationToken);
+        await refreshAfter(result, cancellationToken);
         return result;
-    }
-
-    public async Task<SwitchProfileResult> SwitchProfileAsync(
-        ProfileId profileId,
-        CancellationToken cancellationToken)
-    {
-        if (_isOperationInProgress)
-        {
-            return new SwitchProfileResult(
-                SwitchProfileStatus.Failed);
-        }
-
-        SetOperationInProgress(true);
-        var target = Profiles.FirstOrDefault(
-            profile => profile.Id == profileId);
-        if (target is not null)
-        {
-            target.Status = "전환 중...";
-        }
-
-        OperationStatusMessage =
-            "선택한 프로필로 Codex 전환 중...";
-        DisableAllRunButtons();
-        DisableAllDeleteButtons();
-
-        SwitchProfileResult result;
-        try
-        {
-            result = await _switchProfile.ExecuteAsync(
-                profileId,
-                cancellationToken);
-            OperationStatusMessage =
-                DescribeSwitchResult(result.Status);
-        }
-        finally
-        {
-            SetOperationInProgress(false);
-        }
-
-        HasPendingRecovery =
-            await _profileLogin.HasPendingRecoveryAsync(
-                cancellationToken);
-        await RefreshRuntimeStateAsync(cancellationToken);
-        return result;
-    }
-
-    public async Task<DeleteProfileResult> DeleteProfileAsync(
-        ProfileId profileId,
-        CancellationToken cancellationToken)
-    {
-        if (_isOperationInProgress)
-        {
-            return new DeleteProfileResult(
-                DeleteProfileStatus.Failed);
-        }
-
-        SetOperationInProgress(true);
-        var target = Profiles.FirstOrDefault(
-            profile => profile.Id == profileId);
-        if (target is not null)
-        {
-            target.Status = "삭제 중...";
-        }
-
-        OperationStatusMessage = "선택한 프로필 삭제 중...";
-        DisableAllRunButtons();
-        DisableAllDeleteButtons();
-
-        DeleteProfileResult result;
-        try
-        {
-            result = await _deleteProfile.ExecuteAsync(
-                profileId,
-                cancellationToken);
-            OperationStatusMessage =
-                DescribeDeleteResult(result.Status);
-        }
-        finally
-        {
-            SetOperationInProgress(false);
-        }
-
-        HasPendingRecovery =
-            await _profileLogin.HasPendingRecoveryAsync(
-                cancellationToken);
-        if (result.Status == DeleteProfileStatus.Deleted)
-        {
-            await RefreshProfilesAsync(cancellationToken);
-        }
-        else
-        {
-            await RefreshRuntimeStateAsync(cancellationToken);
-        }
-
-        return result;
-    }
-
-    private void ApplyRuntimeState(ProfileRuntimeState state)
-    {
-        switch (state.Status)
-        {
-            case ProfileRuntimeStatus.Stopped:
-                RuntimeStatusMessage = "Codex 종료됨";
-                foreach (var profile in Profiles)
-                {
-                    profile.IsActive = false;
-                    profile.Status = "준비됨";
-                    profile.ButtonText = "실행";
-                    profile.IsSwitchAction = false;
-                    profile.IsRunEnabled =
-                        !HasPendingRecovery &&
-                        !_isOperationInProgress;
-                    profile.IsDeleteEnabled =
-                        !HasPendingRecovery &&
-                        !_isOperationInProgress;
-                }
-
-                break;
-
-            case ProfileRuntimeStatus.RunningKnownProfile:
-                var active = Profiles.FirstOrDefault(
-                    profile =>
-                        profile.Id == state.ActiveProfileId);
-                RuntimeStatusMessage = active is null
-                    ? "Codex 실행 중 · 프로필 확인 불가"
-                    : $"Codex 실행 중 · {active.Name}";
-
-                foreach (var profile in Profiles)
-                {
-                    profile.IsActive = active is not null &&
-                                       profile.Id == active.Id;
-                    profile.Status = profile.IsActive
-                        ? "실행 중"
-                        : "준비됨";
-                    profile.ButtonText = profile.IsActive
-                        ? "실행 중"
-                        : "전환";
-                    profile.IsSwitchAction =
-                        active is not null &&
-                        !profile.IsActive;
-                    profile.IsRunEnabled =
-                        !profile.IsActive &&
-                        active is not null &&
-                        !HasPendingRecovery &&
-                        !_isOperationInProgress;
-                    profile.IsDeleteEnabled =
-                        !HasPendingRecovery &&
-                        !_isOperationInProgress;
-                }
-
-                break;
-
-            default:
-                RuntimeStatusMessage =
-                    "Codex 실행 중 · 프로필 확인 불가";
-                foreach (var profile in Profiles)
-                {
-                    profile.IsActive = false;
-                    profile.Status = "준비됨";
-                    profile.ButtonText = "전환";
-                    profile.IsSwitchAction = true;
-                    profile.IsRunEnabled = false;
-                    profile.IsDeleteEnabled =
-                        !HasPendingRecovery &&
-                        !_isOperationInProgress;
-                }
-
-                break;
-        }
-    }
-
-    private void DisableAllRunButtons()
-    {
-        foreach (var profile in Profiles)
-        {
-            profile.IsRunEnabled = false;
-        }
-    }
-
-    private void DisableAllDeleteButtons()
-    {
-        foreach (var profile in Profiles)
-        {
-            profile.IsDeleteEnabled = false;
-        }
     }
 
     private void SetOperationInProgress(bool value)
@@ -415,168 +278,5 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _isOperationInProgress = value;
         OnPropertyChanged(nameof(CanAddProfile));
         OnPropertyChanged(nameof(IsOperationInProgress));
-    }
-
-    private static string DescribeRunResult(RunProfileStatus status)
-    {
-        return status switch
-        {
-            RunProfileStatus.Running =>
-                "Codex를 실행했습니다.",
-            RunProfileStatus.AlreadyRunning =>
-                "이미 Codex가 실행 중입니다.",
-            RunProfileStatus.ProfileNotFound =>
-                "선택한 프로필을 찾을 수 없습니다.",
-            RunProfileStatus.InstallationNotFound =>
-                "실행할 수 있는 Codex 설치를 찾지 못했습니다.",
-            RunProfileStatus.LaunchFailed =>
-                "Codex 실행에 실패했습니다. 이전 인증 상태를 복구했습니다.",
-            RunProfileStatus.AuthenticationMismatch =>
-                "인증 상태 확인에 실패해 이전 상태를 복구했습니다.",
-            RunProfileStatus.RecoveryRequired =>
-                "인증 복구가 필요합니다. 이전 로그인 작업 복구를 실행하세요.",
-            _ => "프로필 실행 중 오류가 발생했습니다."
-        };
-    }
-
-    private static string DescribeSwitchResult(SwitchProfileStatus status)
-    {
-        return status switch
-        {
-            SwitchProfileStatus.Switched =>
-                "프로필을 전환했습니다.",
-            SwitchProfileStatus.AlreadyRunningTarget =>
-                "이미 선택한 프로필로 실행 중입니다.",
-            SwitchProfileStatus.ProfileNotFound =>
-                "선택한 프로필을 찾을 수 없습니다.",
-            SwitchProfileStatus.RunningUnknownProfile =>
-                "현재 실행 중인 Codex 프로필을 확인할 수 없어 전환하지 않았습니다.",
-            SwitchProfileStatus.InstallationNotFound =>
-                "실행할 수 있는 Codex 설치를 찾지 못했습니다.",
-            SwitchProfileStatus.LaunchFailed =>
-                "Codex 재실행에 실패했습니다. 이전 인증 상태를 복구했습니다.",
-            SwitchProfileStatus.AuthenticationMismatch =>
-                "전환 후 인증 상태 확인에 실패해 이전 상태를 복구했습니다.",
-            SwitchProfileStatus.RecoveryRequired =>
-                "인증 복구가 필요합니다. 이전 로그인 작업 복구를 실행하세요.",
-            _ => "프로필 전환 중 오류가 발생했습니다."
-        };
-    }
-
-    public static string DescribeDeleteResult(DeleteProfileStatus status)
-    {
-        return status switch
-        {
-            DeleteProfileStatus.Deleted =>
-                "프로필을 삭제했습니다.",
-            DeleteProfileStatus.ProfileNotFound =>
-                "선택한 프로필을 찾을 수 없습니다.",
-            DeleteProfileStatus.ActiveProfileBlocked =>
-                "실행 중인 프로필은 바로 삭제할 수 없습니다. Codex를 종료하거나 다른 프로필로 전환한 뒤 다시 시도하세요.",
-            DeleteProfileStatus.RunningProfileUnknown =>
-                "현재 실행 중인 Codex 프로필을 확인할 수 없어 삭제하지 않았습니다. Codex를 종료한 뒤 다시 시도하세요.",
-            DeleteProfileStatus.RecoveryRequired =>
-                "인증 복구가 필요합니다. 이전 로그인 작업 복구를 실행하세요.",
-            _ => "프로필 삭제에 실패했습니다. 목록은 변경하지 않았습니다."
-        };
-    }
-
-    private bool SetField<T>(
-        ref T field,
-        T value,
-        [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-        {
-            return false;
-        }
-
-        field = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
-
-    private void OnPropertyChanged(
-        [CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(
-            this,
-            new PropertyChangedEventArgs(propertyName));
-    }
-}
-
-public sealed class ProfileListItemViewModel : INotifyPropertyChanged
-{
-    private string _status = "준비됨";
-    private string _buttonText = "실행";
-    private bool _isRunEnabled = true;
-    private bool _isDeleteEnabled = true;
-    private bool _isSwitchAction;
-    private bool _isActive;
-
-    public ProfileListItemViewModel(
-        ProfileId id,
-        string name)
-    {
-        Id = id;
-        Name = name;
-    }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    public ProfileId Id { get; }
-
-    public string Name { get; }
-
-    public string Status
-    {
-        get => _status;
-        set => SetField(ref _status, value);
-    }
-
-    public bool IsRunEnabled
-    {
-        get => _isRunEnabled;
-        set => SetField(ref _isRunEnabled, value);
-    }
-
-    public bool IsDeleteEnabled
-    {
-        get => _isDeleteEnabled;
-        set => SetField(ref _isDeleteEnabled, value);
-    }
-
-    public string ButtonText
-    {
-        get => _buttonText;
-        set => SetField(ref _buttonText, value);
-    }
-
-    public bool IsSwitchAction
-    {
-        get => _isSwitchAction;
-        set => SetField(ref _isSwitchAction, value);
-    }
-
-    public bool IsActive
-    {
-        get => _isActive;
-        set => SetField(ref _isActive, value);
-    }
-
-    private void SetField<T>(
-        ref T field,
-        T value,
-        [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value))
-        {
-            return;
-        }
-
-        field = value;
-        PropertyChanged?.Invoke(
-            this,
-            new PropertyChangedEventArgs(propertyName));
     }
 }

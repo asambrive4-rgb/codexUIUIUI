@@ -178,6 +178,35 @@ public sealed class WindowsProfileStore : IProfileStore
         }
     }
 
+    public async Task ReplaceCredentialAsync(
+        ProfileId profileId,
+        ReadOnlyMemory<byte> credential,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        EnsureStorageRoot();
+
+        var directory = GetExistingSafeProfileDirectory(profileId);
+        var credentialPath = Path.Combine(directory, CredentialFileName);
+        var protectedCredential = _protector.Protect(credential.Span);
+
+        try
+        {
+            await AtomicFileWriter.WriteAsync(
+                credentialPath,
+                protectedCredential,
+                cancellationToken);
+            await VerifyStoredCredentialAsync(
+                credentialPath,
+                credential,
+                cancellationToken);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(protectedCredential);
+        }
+    }
+
     public Task DeleteAsync(
         ProfileId profileId,
         CancellationToken cancellationToken)

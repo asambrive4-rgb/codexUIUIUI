@@ -6,7 +6,7 @@ public sealed class ProfileOperationCoordinator
 
     public bool IsBusy => _gate.CurrentCount == 0;
 
-    internal async Task<IDisposable?> TryEnterAsync(
+    public async Task<IDisposable?> TryEnterAsync(
         CancellationToken cancellationToken)
     {
         var entered = await _gate.WaitAsync(

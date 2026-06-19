@@ -14,6 +14,14 @@ public interface IProfileStore
         ProfileId profileId,
         CancellationToken cancellationToken);
 
+    Task ReplaceCredentialAsync(
+        ProfileId profileId,
+        ReadOnlyMemory<byte> credential,
+        CancellationToken cancellationToken) =>
+        Task.FromException(
+            new NotSupportedException(
+                "이 프로필 저장소는 인증 갱신을 지원하지 않습니다."));
+
     Task DeleteAsync(
         ProfileId profileId,
         CancellationToken cancellationToken);
