@@ -18,6 +18,8 @@ public sealed class RateLimitWindowViewModel : ObservableObject
     private string _automationName;
     private int _remainingPercent;
     private Brush _progressBrush = DeadBrush;
+    private string _resetTimeText = "정보 없음";
+    private bool _isDataAvailable;
 
     public RateLimitWindowViewModel(string label)
     {
@@ -32,6 +34,18 @@ public sealed class RateLimitWindowViewModel : ObservableObject
     {
         get => _displayText;
         private set => SetField(ref _displayText, value);
+    }
+
+    public string ResetTimeText
+    {
+        get => _resetTimeText;
+        private set => SetField(ref _resetTimeText, value);
+    }
+
+    public bool IsDataAvailable
+    {
+        get => _isDataAvailable;
+        private set => SetField(ref _isDataAvailable, value);
     }
 
     public string AutomationName
@@ -60,10 +74,13 @@ public sealed class RateLimitWindowViewModel : ObservableObject
             ProgressBrush = DeadBrush;
             DisplayText = $"{Label} · 정보 없음";
             AutomationName = $"{Label} · 정보 없음";
+            ResetTimeText = "정보 없음";
+            IsDataAvailable = false;
             return;
         }
 
         RemainingPercent = window.RemainingPercent;
+        IsDataAvailable = true;
         ProgressBrush = window.DisplayLevel switch
         {
             RateLimitDisplayLevel.Healthy => HealthyBrush,
@@ -73,6 +90,8 @@ public sealed class RateLimitWindowViewModel : ObservableObject
         };
 
         var resetText = DescribeReset(window.ResetsAt);
+        ResetTimeText = resetText;
+
         if (RemainingPercent == 0)
         {
             DisplayText = $"{Label} · 0% · {resetText}";

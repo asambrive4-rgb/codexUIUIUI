@@ -24,27 +24,27 @@
 
             <!-- Modern Colors (AppBrush) -->
             <SolidColorBrush x:Key="AppBrush.WindowBackground"
-                             Color="#FFF8FAF9" />
+                             Color="#FFF5F5F5" />
             <SolidColorBrush x:Key="AppBrush.TitleBar"
-                             Color="#FFFFFFFF" />
+                             Color="#FFF5F5F5" />
             <SolidColorBrush x:Key="AppBrush.Surface"
                              Color="#FFFFFFFF" />
             <SolidColorBrush x:Key="AppBrush.SurfaceMuted"
                              Color="#FFF1F5F5" />
             <SolidColorBrush x:Key="AppBrush.Border"
-                             Color="#FFE0E6E6" />
+                             Color="#00FFFFFF" />
             <SolidColorBrush x:Key="AppBrush.Text"
-                             Color="#FF1E292B" />
+                             Color="#FF212124" />
             <SolidColorBrush x:Key="AppBrush.TextMuted"
-                             Color="#FF6A7B80" />
+                             Color="#FF868B94" />
             <SolidColorBrush x:Key="AppBrush.Accent"
-                             Color="#FF0D9488" />
+                             Color="#FFFF8A3D" />
             <SolidColorBrush x:Key="AppBrush.AccentMuted"
-                             Color="#FFCCFBEC" />
+                             Color="#FFFFFFFF" />
             <SolidColorBrush x:Key="AppBrush.InfoSurface"
-                             Color="#FFF0FDFA" />
+                             Color="#FFF0F0F0" />
             <SolidColorBrush x:Key="AppBrush.InfoText"
-                             Color="#FF0F766E" />
+                             Color="#FF555555" />
             <SolidColorBrush x:Key="AppBrush.WarningSurface"
                              Color="#FFFFFBEB" />
             <SolidColorBrush x:Key="AppBrush.WarningText"
@@ -56,16 +56,17 @@
             <SolidColorBrush x:Key="AppBrush.SuccessText"
                              Color="#FF16A34A" />
             <SolidColorBrush x:Key="AppBrush.PillSurface"
-                             Color="#FFE2F3F0" />
+                             Color="#FFF0F0F0" />
 
             <!-- Reusable Button Styles with micro-transitions -->
             <!-- Base / Secondary Button Style -->
             <Style x:Key="SecondaryButtonStyle" TargetType="{x:Type Button}">
                 <Setter Property="Background" Value="{DynamicResource AppBrush.Surface}" />
                 <Setter Property="BorderBrush" Value="{DynamicResource AppBrush.Border}" />
-                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Foreground" Value="{DynamicResource AppBrush.Text}" />
                 <Setter Property="Padding" Value="12,6" />
+                <Setter Property="MinHeight" Value="32" />
                 <Setter Property="FocusVisualStyle" Value="{x:Null}" />
                 <Setter Property="Template">
                     <Setter.Value>
@@ -74,7 +75,7 @@
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="6"
+                                    CornerRadius="16"
                                     SnapsToDevicePixels="true">
                                 <ContentPresenter x:Name="contentPresenter"
                                                   Focusable="False"
@@ -110,9 +111,12 @@
             <Style x:Key="AccentButtonStyle" TargetType="{x:Type Button}">
                 <Setter Property="Background" Value="{DynamicResource AppBrush.Accent}" />
                 <Setter Property="BorderBrush" Value="{DynamicResource AppBrush.Accent}" />
+                <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Foreground" Value="White" />
                 <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="Padding" Value="16,8" />
+                <Setter Property="MinHeight" Value="36" />
                 <Setter Property="FocusVisualStyle" Value="{x:Null}" />
                 <Setter Property="Template">
                     <Setter.Value>
@@ -121,7 +125,7 @@
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="6"
+                                    CornerRadius="18"
                                     SnapsToDevicePixels="true">
                                 <ContentPresenter x:Name="contentPresenter"
                                                   Focusable="False"
@@ -133,12 +137,12 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="true">
-                                    <Setter TargetName="border" Property="Background" Value="#FF0F8276" />
-                                    <Setter TargetName="border" Property="BorderBrush" Value="#FF0F8276" />
+                                    <Setter TargetName="border" Property="Background" Value="#FFE57A34" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#FFE57A34" />
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="true">
-                                    <Setter TargetName="border" Property="Background" Value="#FF0B645B" />
-                                    <Setter TargetName="border" Property="BorderBrush" Value="#FF0B645B" />
+                                    <Setter TargetName="border" Property="Background" Value="#FFCC6C2E" />
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#FFCC6C2E" />
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="false">
                                     <Setter TargetName="border" Property="Background" Value="{DynamicResource AppBrush.Border}" />
@@ -154,10 +158,12 @@
             <!-- Danger Button Style (Destructive Actions) -->
             <Style x:Key="DangerButtonStyle" TargetType="{x:Type Button}">
                 <Setter Property="Background" Value="#FFFEF2F2" />
-                <Setter Property="BorderBrush" Value="#FFFEE2E2" />
+                <Setter Property="BorderBrush" Value="#00000000" />
+                <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Foreground" Value="#FEF00000" /> <!-- Dark Red -->
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Padding" Value="12,6" />
+                <Setter Property="MinHeight" Value="32" />
                 <Setter Property="FocusVisualStyle" Value="{x:Null}" />
                 <Setter Property="Template">
                     <Setter.Value>
@@ -166,7 +172,7 @@
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="6"
+                                    CornerRadius="16"
                                     SnapsToDevicePixels="true">
                                 <ContentPresenter x:Name="contentPresenter"
                                                   Focusable="False"
@@ -204,7 +210,7 @@
                 <Setter Property="FontSize"
                         Value="13" />
                 <Setter Property="FontWeight"
-                        Value="SemiBold" />
+                        Value="Bold" />
                 <Setter Property="Foreground"
                         Value="{DynamicResource AppBrush.Text}" />
                 <Setter Property="VerticalAlignment"
@@ -228,9 +234,9 @@
             <Style x:Key="PageTitleTextStyle"
                    TargetType="TextBlock">
                 <Setter Property="FontSize"
-                        Value="28" />
+                        Value="24" />
                 <Setter Property="FontWeight"
-                        Value="Bold" />
+                        Value="ExtraBold" />
                 <Setter Property="Foreground"
                         Value="{DynamicResource AppBrush.Text}" />
             </Style>
@@ -238,9 +244,9 @@
             <Style x:Key="SectionTitleTextStyle"
                    TargetType="TextBlock">
                 <Setter Property="FontSize"
-                        Value="18" />
+                        Value="16" />
                 <Setter Property="FontWeight"
-                        Value="Bold" />
+                        Value="ExtraBold" />
                 <Setter Property="Foreground"
                         Value="{DynamicResource AppBrush.Text}" />
             </Style>
@@ -262,12 +268,10 @@
                         Value="16" />
                 <Setter Property="Background"
                         Value="{DynamicResource AppBrush.Surface}" />
-                <Setter Property="BorderBrush"
-                        Value="{DynamicResource AppBrush.Border}" />
                 <Setter Property="BorderThickness"
-                        Value="1" />
+                        Value="0" />
                 <Setter Property="CornerRadius"
-                        Value="8" />
+                        Value="12" />
             </Style>
 
             <Style x:Key="DialogStatusPanelStyle"

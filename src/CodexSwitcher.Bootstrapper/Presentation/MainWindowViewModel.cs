@@ -45,6 +45,14 @@ public sealed class MainWindowViewModel : ObservableObject
     public ObservableCollection<ProfileListItemViewModel> Profiles =>
         _profileList.Profiles;
 
+    public ProfileListItemViewModel? ActiveProfile =>
+        Profiles.FirstOrDefault(p => p.IsActive);
+
+    public bool HasActiveProfile => ActiveProfile is not null;
+
+    public IEnumerable<ProfileListItemViewModel> InactiveProfiles =>
+        Profiles.Where(p => !p.IsActive);
+
     public string InstallationStatusMessage
     {
         get => _installationStatusMessage;
@@ -179,6 +187,7 @@ public sealed class MainWindowViewModel : ObservableObject
         finally
         {
             _runtimeRefreshGate.Release();
+            NotifyProfileCollectionsChanged();
         }
     }
 
@@ -248,6 +257,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         SetOperationInProgress(true);
         _profileList.BeginOperation(profileId, itemStatus);
+        NotifyProfileCollectionsChanged();
         OperationStatusMessage = operationStatus;
 
         TResult result;
@@ -265,7 +275,15 @@ public sealed class MainWindowViewModel : ObservableObject
             await _profileLogin.HasPendingRecoveryAsync(
                 cancellationToken);
         await refreshAfter(result, cancellationToken);
+        NotifyProfileCollectionsChanged();
         return result;
+    }
+
+    private void NotifyProfileCollectionsChanged()
+    {
+        OnPropertyChanged(nameof(ActiveProfile));
+        OnPropertyChanged(nameof(HasActiveProfile));
+        OnPropertyChanged(nameof(InactiveProfiles));
     }
 
     private void SetOperationInProgress(bool value)
