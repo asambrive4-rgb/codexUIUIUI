@@ -42,8 +42,8 @@ public sealed class ProfilePresentationTests
 
         Assert.AreEqual($"Codex 실행 중 · {active.Name}", message);
         Assert.IsTrue(active.IsActive);
-        Assert.AreEqual("실행 중", active.Status);
-        Assert.AreEqual("실행 중", active.ButtonText);
+        Assert.AreEqual("활성화됨", active.Status);
+        Assert.AreEqual("전환", active.ButtonText);
         Assert.IsFalse(active.IsRunEnabled);
         Assert.IsTrue(active.IsDeleteEnabled);
 
@@ -56,24 +56,25 @@ public sealed class ProfilePresentationTests
     }
 
     [TestMethod]
-    public void ApplyRuntimeState_UnknownProfile_DisablesRun()
+    public void ApplyRuntimeState_UnknownProfile_AllowsSwitch()
     {
         var state = CreateState();
 
         var message = state.ApplyRuntimeState(
             new ProfileRuntimeState(
                 ProfileRuntimeStatus.RunningUnknownProfile),
-            canOperate: false);
+            canOperate: true);
 
         Assert.AreEqual(
             "Codex 실행 중 · 프로필 확인 불가",
             message);
         Assert.IsTrue(state.Profiles.All(
             profile =>
+                profile.Status == "준비됨" &&
                 profile.ButtonText == "전환" &&
                 profile.IsSwitchAction &&
-                !profile.IsRunEnabled &&
-                !profile.IsDeleteEnabled));
+                profile.IsRunEnabled &&
+                profile.IsDeleteEnabled));
     }
 
     [TestMethod]
@@ -190,6 +191,30 @@ public sealed class ProfilePresentationTests
     }
 
     [TestMethod]
+    public void WeeklyRateLimit_ShowsResetDateAndTime()
+    {
+        var viewModel = new RateLimitWindowViewModel("주간 한도");
+        var resetTime = new DateTimeOffset(
+            2026,
+            6,
+            29,
+            20,
+            15,
+            0,
+            TimeSpan.Zero).ToLocalTime();
+
+        viewModel.Apply(
+            new RateLimitWindow(
+                UsedPercent: 20,
+                WindowDurationMinutes: 10080,
+                ResetsAt: resetTime));
+
+        Assert.AreEqual(
+            resetTime.ToString("M월 d일 HH:mm"),
+            viewModel.ResetTimeText);
+    }
+
+    [TestMethod]
     public void OperationFormatter_PreservesRepresentativeMessages()
     {
         Assert.AreEqual(
@@ -197,7 +222,7 @@ public sealed class ProfilePresentationTests
             ProfileOperationMessageFormatter.Describe(
                 RunProfileStatus.Running));
         Assert.AreEqual(
-            "현재 실행 중인 Codex 프로필을 확인할 수 없어 전환하지 않았습니다.",
+            "프로필 전환 중 오류가 발생했습니다.",
             ProfileOperationMessageFormatter.Describe(
                 SwitchProfileStatus.RunningUnknownProfile));
         Assert.AreEqual(

@@ -95,6 +95,27 @@ public sealed class RefreshProfileRateLimitUseCaseTests
             "조회 결과의 평문 인증은 사용 후 메모리에서 지워야 합니다.");
     }
 
+    [TestMethod]
+    public async Task Execute_WhenReaderThrows_ReturnsFailed()
+    {
+        var profile = CreateProfile();
+        var store = new StubProfileStore(profile);
+        var reader = new StubRateLimitReader(
+            new InvalidOperationException("read failed"));
+        var useCase = CreateUseCase(store, reader);
+
+        var result = await useCase.ExecuteAsync(
+            profile.Id,
+            keepAlive: false,
+            CancellationToken.None);
+
+        Assert.AreEqual(
+            ProfileRateLimitStatus.Failed,
+            result.Status);
+        Assert.IsNull(result.FiveHourLimit);
+        Assert.IsNull(result.WeeklyLimit);
+    }
+
     private static RefreshProfileRateLimitUseCase CreateUseCase(
         IProfileStore store,
         IProfileRateLimitReader reader) =>
@@ -158,11 +179,20 @@ public sealed class RefreshProfileRateLimitUseCaseTests
         : IProfileRateLimitReader
     {
         private readonly ProfileRateLimitReadResult _result;
+        private readonly Exception? _exception;
 
         public StubRateLimitReader(
             ProfileRateLimitReadResult result)
         {
             _result = result;
+        }
+
+        public StubRateLimitReader(Exception exception)
+        {
+            _result = new ProfileRateLimitReadResult(
+                ProfileRateLimitStatus.Failed,
+                []);
+            _exception = exception;
         }
 
         public bool LastKeepAlive { get; private set; }
@@ -174,6 +204,11 @@ public sealed class RefreshProfileRateLimitUseCaseTests
             CancellationToken cancellationToken)
         {
             LastKeepAlive = keepAlive;
+            if (_exception is not null)
+            {
+                throw _exception;
+            }
+
             return Task.FromResult(_result);
         }
 

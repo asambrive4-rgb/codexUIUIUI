@@ -7,5 +7,7 @@ public enum ProfileRateLimitStatus
     UnsupportedAuthentication,
     AuthenticationExpired,
     CodexUpdateRequired,
+    AppServerUnavailable,
+    ResponseFormatChanged,
     Failed
 }

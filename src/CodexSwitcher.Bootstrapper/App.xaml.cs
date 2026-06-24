@@ -70,7 +70,8 @@ public partial class App : Application
             new GetProfileRuntimeStateUseCase(
                 profileStore,
                 authenticationSession,
-                codexController);
+                codexController,
+                new CodexAuthJsonCredentialIdentityReader());
         var rateLimitReader =
             new WindowsCodexRateLimitReader();
         var refreshProfileRateLimit =

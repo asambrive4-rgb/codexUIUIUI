@@ -62,6 +62,34 @@ public sealed class GetProfileRuntimeStateUseCaseTests
     }
 
     [TestMethod]
+    public async Task Execute_WithMatchingAccountId_ReturnsKnownProfile()
+    {
+        var fixture = new Fixture();
+        var matching = fixture.AddProfile(
+            "Work",
+            "stored-refreshed-token"u8.ToArray());
+        _ = fixture.AddProfile(
+            "Personal",
+            "other-token"u8.ToArray());
+        fixture.Authentication.CurrentCredential =
+            "current-refreshed-token"u8.ToArray();
+        fixture.Identity.AccountIds["current-refreshed-token"] =
+            "acct_1";
+        fixture.Identity.AccountIds["stored-refreshed-token"] =
+            "acct_1";
+        fixture.Identity.AccountIds["other-token"] =
+            "acct_2";
+
+        var result = await fixture.UseCase.ExecuteAsync(
+            CancellationToken.None);
+
+        Assert.AreEqual(
+            ProfileRuntimeStatus.RunningKnownProfile,
+            result.Status);
+        Assert.AreEqual(matching.Id, result.ActiveProfileId);
+    }
+
+    [TestMethod]
     public async Task Execute_WithDuplicateCredentialMatches_ReturnsUnknown()
     {
         var fixture = new Fixture();
@@ -106,10 +134,12 @@ public sealed class GetProfileRuntimeStateUseCaseTests
             Store = new StubProfileStore();
             Authentication = new StubAuthenticationSession();
             Codex = new StubCodexController();
+            Identity = new StubCredentialIdentityReader();
             UseCase = new GetProfileRuntimeStateUseCase(
                 Store,
                 Authentication,
-                Codex);
+                Codex,
+                Identity);
         }
 
         public StubProfileStore Store { get; }
@@ -117,6 +147,8 @@ public sealed class GetProfileRuntimeStateUseCaseTests
         public StubAuthenticationSession Authentication { get; }
 
         public StubCodexController Codex { get; }
+
+        public StubCredentialIdentityReader Identity { get; }
 
         public GetProfileRuntimeStateUseCase UseCase { get; }
 
@@ -130,6 +162,19 @@ public sealed class GetProfileRuntimeStateUseCaseTests
             Store.Profiles.Add(profile);
             Store.Credentials[profile.Id] = credential;
             return profile;
+        }
+    }
+
+    private sealed class StubCredentialIdentityReader
+        : ICredentialIdentityReader
+    {
+        public Dictionary<string, string> AccountIds { get; } = [];
+
+        public string? TryReadAccountId(
+            ReadOnlySpan<byte> credential)
+        {
+            var text = System.Text.Encoding.UTF8.GetString(credential);
+            return AccountIds.GetValueOrDefault(text);
         }
     }
 

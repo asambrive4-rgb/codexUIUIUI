@@ -93,10 +93,10 @@ internal sealed class ProfileListPresentationState
                 active is not null &&
                 profile.Id == active.Id;
             profile.Status = profile.IsActive
-                ? "실행 중"
+                ? "활성화됨"
                 : "준비됨";
             profile.ButtonText = profile.IsActive
-                ? "실행 중"
+                ? "전환"
                 : "전환";
             profile.IsSwitchAction =
                 active is not null &&
@@ -121,7 +121,7 @@ internal sealed class ProfileListPresentationState
             profile.Status = "준비됨";
             profile.ButtonText = "전환";
             profile.IsSwitchAction = true;
-            profile.IsRunEnabled = false;
+            profile.IsRunEnabled = canOperate;
             profile.IsDeleteEnabled = canOperate;
         }
 

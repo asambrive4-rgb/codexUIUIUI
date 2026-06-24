@@ -80,11 +80,6 @@ public sealed class SwitchProfileUseCase
                         profiles.Profiles,
                         currentCredential,
                         cancellationToken);
-                if (activeProfileId is null)
-                {
-                    return Result(SwitchProfileStatus.RunningUnknownProfile);
-                }
-
                 if (activeProfileId == profileId)
                 {
                     return Result(SwitchProfileStatus.AlreadyRunningTarget);

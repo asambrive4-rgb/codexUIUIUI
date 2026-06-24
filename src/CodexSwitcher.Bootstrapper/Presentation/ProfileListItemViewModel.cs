@@ -111,6 +111,10 @@ public sealed class ProfileListItemViewModel : ObservableObject
                 "인증이 만료되어 사용량을 확인할 수 없습니다.",
             ProfileRateLimitStatus.CodexUpdateRequired =>
                 "Codex 업데이트 후 사용량을 확인할 수 있습니다.",
+            ProfileRateLimitStatus.AppServerUnavailable =>
+                "Codex 사용량 조회를 시작하지 못했습니다.",
+            ProfileRateLimitStatus.ResponseFormatChanged =>
+                "Codex 사용량 응답 형식이 바뀌었습니다.",
             _ when HasUsageData =>
                 $"갱신 실패 · 마지막 확인 {DescribeLastSuccess(snapshot.LastSuccessfulAt)}",
             _ => "사용량을 불러오지 못했습니다."

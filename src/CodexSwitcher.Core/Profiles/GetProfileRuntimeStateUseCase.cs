@@ -7,15 +7,30 @@ public sealed class GetProfileRuntimeStateUseCase
     private readonly IProfileStore _profileStore;
     private readonly IAuthenticationSession _authenticationSession;
     private readonly ICodexLoginController _codexController;
+    private readonly ICredentialIdentityReader _identityReader;
 
     public GetProfileRuntimeStateUseCase(
         IProfileStore profileStore,
         IAuthenticationSession authenticationSession,
         ICodexLoginController codexController)
+        : this(
+            profileStore,
+            authenticationSession,
+            codexController,
+            new NoCredentialIdentityReader())
+    {
+    }
+
+    public GetProfileRuntimeStateUseCase(
+        IProfileStore profileStore,
+        IAuthenticationSession authenticationSession,
+        ICodexLoginController codexController,
+        ICredentialIdentityReader identityReader)
     {
         _profileStore = profileStore;
         _authenticationSession = authenticationSession;
         _codexController = codexController;
+        _identityReader = identityReader;
     }
 
     public async Task<ProfileRuntimeState> ExecuteAsync(
@@ -41,6 +56,8 @@ public sealed class GetProfileRuntimeStateUseCase
             var stored = await _profileStore.ReadAllAsync(
                 cancellationToken);
             var matches = new List<ProfileId>();
+            var currentAccountId =
+                _identityReader.TryReadAccountId(currentCredential);
 
             foreach (var profile in stored.Profiles)
             {
@@ -56,6 +73,16 @@ public sealed class GetProfileRuntimeStateUseCase
                         CryptographicOperations.FixedTimeEquals(
                             storedCredential,
                             currentCredential))
+                    {
+                        matches.Add(profile.Id);
+                        continue;
+                    }
+
+                    if (currentAccountId is not null &&
+                        StringComparer.Ordinal.Equals(
+                            currentAccountId,
+                            _identityReader.TryReadAccountId(
+                                storedCredential)))
                     {
                         matches.Add(profile.Id);
                     }
@@ -105,4 +132,11 @@ public sealed class GetProfileRuntimeStateUseCase
 
     private static ProfileRuntimeState Unknown() =>
         new(ProfileRuntimeStatus.RunningUnknownProfile);
+
+    private sealed class NoCredentialIdentityReader
+        : ICredentialIdentityReader
+    {
+        public string? TryReadAccountId(
+            ReadOnlySpan<byte> credential) => null;
+    }
 }

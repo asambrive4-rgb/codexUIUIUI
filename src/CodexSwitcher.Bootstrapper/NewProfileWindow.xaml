@@ -4,7 +4,7 @@
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  Title="새 프로필 추가"
                  Width="480"
-                 Height="350"
+                 Height="370"
                  ResizeMode="NoResize"
                  Background="{DynamicResource AppBrush.WindowBackground}"
                  ExtendsContentIntoTitleBar="True"
@@ -15,17 +15,17 @@
             <RowDefinition Height="46" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-
+ 
         <ui:TitleBar Grid.Row="0"
-                     Height="46"
-                     Background="{DynamicResource AppBrush.TitleBar}"
-                     ShowMaximize="False">
+                      Height="46"
+                      Background="{DynamicResource AppBrush.TitleBar}"
+                      ShowMaximize="False">
             <ui:TitleBar.Header>
                 <StackPanel Margin="16,0,0,0"
-                            Orientation="Horizontal">
+                             Orientation="Horizontal">
                     <Image Width="20"
                            Height="20"
-                           Margin="0,0,9,0"
+                           Margin="0,0,8,0"
                            VerticalAlignment="Center"
                            Source="Assets/codexUIUIUI.png" />
                     <TextBlock Style="{StaticResource TitleBarCaptionTextStyle}"
@@ -33,68 +33,78 @@
                 </StackPanel>
             </ui:TitleBar.Header>
         </ui:TitleBar>
-
+ 
         <Grid Grid.Row="1"
-              Margin="26,18,26,26">
+              Margin="26,16,26,26">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" /> <!-- 0: Header -->
+                <RowDefinition Height="Auto" /> <!-- 1: Input -->
+                <RowDefinition Height="*" />    <!-- 2: Hint / Status panel -->
+                <RowDefinition Height="Auto" /> <!-- 3: Action Buttons -->
             </Grid.RowDefinitions>
-
-            <StackPanel>
+ 
+            <!-- Header -->
+            <StackPanel Grid.Row="0">
                 <TextBlock Style="{StaticResource SectionTitleTextStyle}"
                            Text="프로필 만들기" />
-                <TextBlock Margin="0,8,0,0"
+                <TextBlock Margin="0,6,0,0"
                            Style="{StaticResource MutedTextStyle}"
                            Text="프로필 이름을 정한 뒤 Codex의 기존 로그인 화면에서 로그인합니다." />
             </StackPanel>
+
+            <!-- Input field -->
             <StackPanel Grid.Row="1"
-                        Margin="0,22,0,0">
+                        Margin="0,16,0,0">
                 <TextBlock FontWeight="SemiBold"
+                           FontSize="12"
                            Foreground="{DynamicResource AppBrush.Text}"
                            Text="프로필 이름" />
                 <TextBox x:Name="ProfileNameTextBox"
-                         Margin="0,8,0,0"
-                         MinHeight="36"
+                         Margin="0,6,0,0"
+                         MinHeight="34"
                          MaxLength="80"
                          Padding="10,6"
                          VerticalContentAlignment="Center" />
             </StackPanel>
+
+            <!-- Hint status panel -->
             <Border Grid.Row="2"
-                    Margin="0,18,0,0"
+                    Margin="0,16,0,0"
                     Style="{StaticResource DialogStatusPanelStyle}">
                 <TextBlock x:Name="StatusTextBlock"
                            Foreground="{DynamicResource AppBrush.TextMuted}"
                            TextWrapping="Wrap"
+                           FontSize="11.5"
+                           LineHeight="16"
                            Text="이메일이나 비밀번호는 이 앱에 입력하지 않습니다. Codex의 기존 로그인 화면을 사용합니다." />
             </Border>
+
+            <!-- Buttons -->
             <StackPanel Grid.Row="3"
-                        Margin="0,20,0,0"
+                        Margin="0,16,0,0"
                         HorizontalAlignment="Right"
                         Orientation="Horizontal">
                 <Button x:Name="CancelButton"
                         Style="{StaticResource SecondaryButtonStyle}"
                         MinWidth="82"
-                        MinHeight="34"
-                        Padding="12,7"
+                        MinHeight="32"
+                        Padding="12,6"
                         Click="Cancel_Click"
                         Content="취소" />
                 <Button x:Name="StartButton"
                         Style="{StaticResource AccentButtonStyle}"
                         Margin="8,0,0,0"
                         MinWidth="120"
-                        MinHeight="34"
-                        Padding="12,7"
+                        MinHeight="32"
+                        Padding="12,6"
                         Click="Start_Click"
                         Content="생성 및 로그인" />
                 <Button x:Name="CompleteButton"
                         Style="{StaticResource AccentButtonStyle}"
                         Margin="8,0,0,0"
                         MinWidth="110"
-                        MinHeight="34"
-                        Padding="12,7"
+                        MinHeight="32"
+                        Padding="12,6"
                         Click="Complete_Click"
                         Content="로그인 완료"
                         Visibility="Collapsed" />

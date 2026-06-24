@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex UI Diagnostic"
+  short_description: "Diagnose Codex Account Switcher UI/runtime stalls"
+  default_prompt: "Use $codex-ui-diagnostic to diagnose a Codex Account Switcher UI state that is stuck or disabled."

@@ -123,7 +123,7 @@ public sealed class RateLimitWindowViewModel : ObservableObject
         }
         else
         {
-            return localTime.ToString("M월 d일");
+            return localTime.ToString("M월 d일 HH:mm");
         }
     }
 

@@ -46,6 +46,8 @@ public sealed class ProfileUsageMonitor : IDisposable
             _visibleSurfaceCount++;
             if (_visibleSurfaceCount == 1)
             {
+                UsageMonitorDiagnostics.Write(
+                    "visible surface acquired; starting monitor");
                 StartMonitor();
             }
         }
@@ -110,6 +112,7 @@ public sealed class ProfileUsageMonitor : IDisposable
         _monitorCancellation?.Cancel();
         _monitorCancellation?.Dispose();
         _monitorCancellation = new CancellationTokenSource();
+        UsageMonitorDiagnostics.Write("monitor task scheduled");
         _ = MonitorAsync(_monitorCancellation.Token);
     }
 
@@ -135,6 +138,8 @@ public sealed class ProfileUsageMonitor : IDisposable
         cancellation?.Dispose();
         if (cancellation is not null)
         {
+            UsageMonitorDiagnostics.Write(
+                "visible surface released; stopping monitor");
             _ = Task.Run(_reader.StopActiveSession);
         }
     }
@@ -165,18 +170,37 @@ public sealed class ProfileUsageMonitor : IDisposable
     {
         try
         {
-            await RefreshCycleAsync(
-                forceAll: true,
-                cancellationToken);
+            UsageMonitorDiagnostics.Write("monitor started");
+            try
+            {
+                await RefreshCycleAsync(
+                    forceAll: true,
+                    cancellationToken);
+            }
+            catch (Exception)
+                when (!cancellationToken.IsCancellationRequested)
+            {
+                UsageMonitorDiagnostics.Write(
+                    "initial refresh cycle failed");
+            }
 
             using var timer = new PeriodicTimer(
                 ProfileUsageRefreshPolicy.ActiveRefreshInterval);
             while (await timer.WaitForNextTickAsync(
                        cancellationToken))
             {
-                await RefreshCycleAsync(
-                    forceAll: false,
-                    cancellationToken);
+                try
+                {
+                    await RefreshCycleAsync(
+                        forceAll: false,
+                        cancellationToken);
+                }
+                catch (Exception)
+                    when (!cancellationToken.IsCancellationRequested)
+                {
+                    UsageMonitorDiagnostics.Write(
+                        "refresh cycle failed");
+                }
             }
         }
         catch (OperationCanceledException)
@@ -195,9 +219,13 @@ public sealed class ProfileUsageMonitor : IDisposable
                 millisecondsTimeout: 0,
                 cancellationToken))
         {
+            UsageMonitorDiagnostics.Write(
+                $"refresh cycle skipped forceAll={forceAll}");
             return;
         }
 
+        UsageMonitorDiagnostics.Write(
+            $"refresh cycle started forceAll={forceAll}");
         if (forceAll)
         {
             RefreshingChanged?.Invoke(this, true);
@@ -208,6 +236,8 @@ public sealed class ProfileUsageMonitor : IDisposable
                 cancellationToken);
             var runtime = await _getRuntimeState.ExecuteAsync(
                 cancellationToken);
+            UsageMonitorDiagnostics.Write(
+                $"profiles={profiles.Profiles.Count} runtime={runtime.Status}");
             var activeProfileId =
                 runtime.Status ==
                 ProfileRuntimeStatus.RunningKnownProfile
@@ -217,13 +247,15 @@ public sealed class ProfileUsageMonitor : IDisposable
             if (runtime.Status ==
                 ProfileRuntimeStatus.RunningUnknownProfile)
             {
+                UsageMonitorDiagnostics.Write(
+                    "runtime unknown; probing stored profiles as inactive");
                 _reader.StopActiveSession();
-                PublishAll();
-                return;
             }
 
             if (activeProfileId is null)
             {
+                UsageMonitorDiagnostics.Write(
+                    "no active profile; stopping active usage session");
                 _reader.StopActiveSession();
             }
 
@@ -273,11 +305,33 @@ public sealed class ProfileUsageMonitor : IDisposable
                 {
                     SetLoading(profile.Id);
                 }
-                var refreshed =
-                    await _refreshProfile.ExecuteAsync(
+                ProfileRateLimitSnapshot refreshed;
+                try
+                {
+                    UsageMonitorDiagnostics.Write(
+                        $"profile refresh started active={isActive}");
+                    refreshed =
+                        await _refreshProfile.ExecuteAsync(
+                            profile.Id,
+                            keepAlive: isActive,
+                            cancellationToken);
+                    UsageMonitorDiagnostics.Write(
+                        $"profile refresh completed status={refreshed.Status}");
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch
+                {
+                    UsageMonitorDiagnostics.Write(
+                        "profile refresh threw; publishing failed snapshot");
+                    refreshed = new ProfileRateLimitSnapshot(
                         profile.Id,
-                        keepAlive: isActive,
-                        cancellationToken);
+                        ProfileRateLimitStatus.Failed);
+                }
+
                 ApplyRefreshResult(
                     refreshed,
                     isActive);
@@ -291,6 +345,8 @@ public sealed class ProfileUsageMonitor : IDisposable
             {
                 RefreshingChanged?.Invoke(this, false);
             }
+            UsageMonitorDiagnostics.Write(
+                $"refresh cycle finished forceAll={forceAll}");
             _refreshGate.Release();
         }
     }
@@ -317,6 +373,7 @@ public sealed class ProfileUsageMonitor : IDisposable
             previous?.WeeklyLimit,
             previous?.LastSuccessfulAt);
         _snapshots[profileId] = loading;
+        UsageMonitorDiagnostics.Write("loading snapshot published");
         SnapshotChanged?.Invoke(this, loading);
     }
 
@@ -355,6 +412,8 @@ public sealed class ProfileUsageMonitor : IDisposable
         SnapshotChanged?.Invoke(
             this,
             _snapshots[refreshed.ProfileId]);
+        UsageMonitorDiagnostics.Write(
+            $"snapshot published status={_snapshots[refreshed.ProfileId].Status}");
     }
 
     private void RemoveDeletedProfiles(

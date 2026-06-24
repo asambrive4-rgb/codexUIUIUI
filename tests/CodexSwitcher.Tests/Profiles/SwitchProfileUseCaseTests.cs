@@ -60,7 +60,7 @@ public sealed class SwitchProfileUseCaseTests
     }
 
     [TestMethod]
-    public async Task Execute_WhenCurrentRunningProfileIsUnknown_DoesNotSwitch()
+    public async Task Execute_WhenCurrentRunningProfileIsUnknown_ForceStopsAndSwitches()
     {
         var fixture = new Fixture();
         fixture.Authentication.CurrentCredential =
@@ -71,14 +71,17 @@ public sealed class SwitchProfileUseCaseTests
             CancellationToken.None);
 
         Assert.AreEqual(
-            SwitchProfileStatus.RunningUnknownProfile,
+            SwitchProfileStatus.Switched,
             result.Status);
-        CollectionAssert.DoesNotContain(
+        CollectionAssert.Contains(
             fixture.Events,
-            "codex:request-stop");
-        CollectionAssert.DoesNotContain(
+            "codex:force-stop");
+        CollectionAssert.Contains(
             fixture.Events,
             "auth:prepare-profile");
+        CollectionAssert.AreEqual(
+            fixture.TargetCredential,
+            fixture.Authentication.CurrentCredential);
     }
 
     [TestMethod]

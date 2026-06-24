@@ -3,9 +3,9 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  Title="프로필 삭제"
-                 Width="520"
+                 Width="500"
                  MinWidth="460"
-                 MinHeight="280"
+                 MinHeight="260"
                  ResizeMode="NoResize"
                  SizeToContent="Height"
                  Background="{DynamicResource AppBrush.WindowBackground}"
@@ -17,17 +17,17 @@
             <RowDefinition Height="46" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-
+ 
         <ui:TitleBar Grid.Row="0"
-                     Height="46"
-                     Background="{DynamicResource AppBrush.TitleBar}"
-                     ShowMaximize="False">
+                      Height="46"
+                      Background="{DynamicResource AppBrush.TitleBar}"
+                      ShowMaximize="False">
             <ui:TitleBar.Header>
                 <StackPanel Margin="16,0,0,0"
-                            Orientation="Horizontal">
+                             Orientation="Horizontal">
                     <Image Width="20"
                            Height="20"
-                           Margin="0,0,9,0"
+                           Margin="0,0,8,0"
                            VerticalAlignment="Center"
                            Source="Assets/codexUIUIUI.png" />
                     <TextBlock Style="{StaticResource TitleBarCaptionTextStyle}"
@@ -35,35 +35,45 @@
                 </StackPanel>
             </ui:TitleBar.Header>
         </ui:TitleBar>
-
+ 
         <Grid Grid.Row="1"
-              Margin="26,18,26,26">
+              Margin="24,16,24,24">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" /> <!-- 0: Title -->
+                <RowDefinition Height="Auto" /> <!-- 1: Warning card -->
+                <RowDefinition Height="Auto" /> <!-- 2: Buttons -->
             </Grid.RowDefinitions>
-
+ 
+            <!-- Title -->
             <TextBlock Grid.Row="0"
-                       Style="{StaticResource SectionTitleTextStyle}"
-                       Text="{Binding TitleText}"
-                       TextWrapping="Wrap" />
+                        Style="{StaticResource SectionTitleTextStyle}"
+                        Text="{Binding TitleText}"
+                        TextWrapping="Wrap"
+                        FontSize="13.5"
+                        LineHeight="18" />
+
+            <!-- Warning card with aligned status panel style -->
             <Border Grid.Row="1"
-                    Margin="0,18,0,0"
+                    Margin="0,16,0,0"
                     Style="{StaticResource StatusPanelStyle}"
-                    Background="{DynamicResource AppBrush.WarningSurface}">
-                <TextBlock FontSize="14"
+                    Background="{DynamicResource AppBrush.WarningSurface}"
+                    BorderBrush="{DynamicResource AppBrush.WarningText}"
+                    BorderThickness="1">
+                <TextBlock FontSize="12"
+                           LineHeight="17"
                            Foreground="{DynamicResource AppBrush.WarningText}"
                            Text="이 프로필에 저장된 Codex 로그인 정보가 삭제됩니다. 공통 Codex 작업 데이터와 설정은 삭제되지 않습니다. 로그인 정보 삭제는 되돌릴 수 없습니다."
                            TextWrapping="Wrap" />
             </Border>
+
+            <!-- Action buttons -->
             <StackPanel Grid.Row="2"
-                        Margin="0,22,0,0"
+                        Margin="0,20,0,0"
                         HorizontalAlignment="Right"
                         Orientation="Horizontal">
                 <Button Style="{StaticResource SecondaryButtonStyle}"
                         MinWidth="84"
-                        MinHeight="34"
+                        MinHeight="32"
                         AutomationProperties.Name="삭제 취소"
                         Padding="12,6"
                         Click="Cancel_Click"
@@ -71,7 +81,7 @@
                         IsCancel="True" />
                 <Button Style="{StaticResource DangerButtonStyle}"
                         MinWidth="220"
-                        MinHeight="34"
+                        MinHeight="32"
                         AutomationProperties.Name="프로필 및 로그인 정보 삭제"
                         Margin="8,0,0,0"
                         Padding="12,6"

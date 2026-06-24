@@ -17,6 +17,8 @@ public sealed class WindowsCodexRateLimitReader
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CurrentUserStorageAcl _storageAcl = new();
+    private readonly CodexAuthJsonCredentialIdentityReader
+        _identityReader = new();
     private readonly string _probeRoot;
     private AppServerSession? _activeSession;
     private ProfileId? _activeProfileId;
@@ -87,6 +89,7 @@ public sealed class WindowsCodexRateLimitReader
                     DisposeActiveSession();
                 }
 
+                UsageReaderDiagnostics.Write("read timed out");
                 return Failed();
             }
             catch (RpcException exception)
@@ -96,24 +99,38 @@ public sealed class WindowsCodexRateLimitReader
                     DisposeActiveSession();
                 }
 
+                UsageReaderDiagnostics.Write(
+                    $"rpc error code={exception.Code}");
                 return exception.Code == -32601
                     ? new ProfileRateLimitReadResult(
                         ProfileRateLimitStatus.CodexUpdateRequired,
                         [])
-                    : Failed();
+                    : AppServerUnavailable();
             }
             catch (Exception exception)
                 when (exception is IOException or
                       UnauthorizedAccessException or
-                      InvalidOperationException or
-                      JsonException)
+                      InvalidOperationException)
             {
                 if (keepAlive)
                 {
                     DisposeActiveSession();
                 }
 
-                return Failed();
+                UsageReaderDiagnostics.Write(
+                    $"app-server unavailable exception={exception.GetType().Name}");
+                return AppServerUnavailable();
+            }
+            catch (JsonException exception)
+            {
+                if (keepAlive)
+                {
+                    DisposeActiveSession();
+                }
+
+                UsageReaderDiagnostics.Write(
+                    $"response format changed exception={exception.GetType().Name}");
+                return ResponseFormatChanged();
             }
             finally
             {
@@ -204,6 +221,9 @@ public sealed class WindowsCodexRateLimitReader
         {
             if (!CredentialsEqual(
                     credential.Span,
+                    currentCredential) &&
+                !SameAccount(
+                    credential.Span,
                     currentCredential))
             {
                 throw new InvalidOperationException(
@@ -251,6 +271,8 @@ public sealed class WindowsCodexRateLimitReader
 
             var executablePath =
                 await ResolveCodexExecutablePathAsync(cancellationToken);
+            UsageReaderDiagnostics.Write(
+                "starting temporary app-server");
             return await AppServerSession.StartAsync(
                 executablePath,
                 sessionRoot,
@@ -460,6 +482,12 @@ public sealed class WindowsCodexRateLimitReader
     private static ProfileRateLimitReadResult Failed() =>
         new(ProfileRateLimitStatus.Failed, []);
 
+    private static ProfileRateLimitReadResult AppServerUnavailable() =>
+        new(ProfileRateLimitStatus.AppServerUnavailable, []);
+
+    private static ProfileRateLimitReadResult ResponseFormatChanged() =>
+        new(ProfileRateLimitStatus.ResponseFormatChanged, []);
+
     private static bool CredentialsEqual(
         ReadOnlySpan<byte> expected,
         ReadOnlySpan<byte> actual)
@@ -468,6 +496,18 @@ public sealed class WindowsCodexRateLimitReader
                CryptographicOperations.FixedTimeEquals(
                    expected,
                    actual);
+    }
+
+    private bool SameAccount(
+        ReadOnlySpan<byte> expected,
+        ReadOnlySpan<byte> actual)
+    {
+        var expectedAccountId =
+            _identityReader.TryReadAccountId(expected);
+        return expectedAccountId is not null &&
+               StringComparer.Ordinal.Equals(
+                   expectedAccountId,
+                   _identityReader.TryReadAccountId(actual));
     }
 
     private sealed class AppServerSession : IDisposable
@@ -619,8 +659,11 @@ public sealed class WindowsCodexRateLimitReader
             var result = response["result"]?.AsObject()
                 ?? throw new JsonException(
                     "사용량 응답 형식이 올바르지 않습니다.");
-            var snapshot = SelectCodexSnapshot(result);
-            var windows = ReadWindows(snapshot);
+            var parsed = CodexRateLimitResponseParser.Parse(result);
+            if (parsed.Status != ProfileRateLimitStatus.Available)
+            {
+                return parsed;
+            }
 
             var after = await ReadAccountAsync(cancellationToken);
             byte[]? refreshedCredential = null;
@@ -650,7 +693,7 @@ public sealed class WindowsCodexRateLimitReader
 
             return new ProfileRateLimitReadResult(
                 ProfileRateLimitStatus.Available,
-                windows,
+                parsed.Windows,
                 refreshedCredential);
         }
 
@@ -723,49 +766,6 @@ public sealed class WindowsCodexRateLimitReader
                 account["type"]?.GetValue<string>() ?? "",
                 account["email"]?.GetValue<string>(),
                 account["planType"]?.GetValue<string>());
-        }
-
-        private static JsonObject SelectCodexSnapshot(JsonObject result)
-        {
-            var byLimitId = result["rateLimitsByLimitId"] as JsonObject;
-            if (byLimitId?["codex"] is JsonObject codex)
-            {
-                return codex;
-            }
-
-            return result["rateLimits"]?.AsObject()
-                   ?? throw new JsonException(
-                       "Codex 사용량 항목을 찾을 수 없습니다.");
-        }
-
-        private static IReadOnlyList<RateLimitWindow> ReadWindows(
-            JsonObject snapshot)
-        {
-            var windows = new List<RateLimitWindow>(2);
-            AddWindow(snapshot["primary"], windows);
-            AddWindow(snapshot["secondary"], windows);
-            return windows;
-        }
-
-        private static void AddWindow(
-            JsonNode? node,
-            ICollection<RateLimitWindow> destination)
-        {
-            if (node is not JsonObject window ||
-                window["usedPercent"] is null)
-            {
-                return;
-            }
-
-            var resetsAt = window["resetsAt"]?.GetValue<long?>();
-            destination.Add(
-                new RateLimitWindow(
-                    window["usedPercent"]!.GetValue<int>(),
-                    window["windowDurationMins"]?.GetValue<long?>(),
-                    resetsAt is null
-                        ? null
-                        : DateTimeOffset.FromUnixTimeSeconds(
-                            resetsAt.Value)));
         }
 
         private async Task SendAsync(
