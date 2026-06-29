@@ -1,6 +1,7 @@
 <ui:FluentWindow x:Class="CodexSwitcher.Bootstrapper.DeleteProfileConfirmationWindow"
                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:local="clr-namespace:CodexSwitcher.Bootstrapper"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  Title="프로필 삭제"
                  Width="500"
@@ -21,6 +22,7 @@
         <ui:TitleBar Grid.Row="0"
                       Height="46"
                       Background="{DynamicResource AppBrush.TitleBar}"
+                      local:TitleBarDragBehavior.IsEnabled="True"
                       ShowMaximize="False">
             <ui:TitleBar.Header>
                 <StackPanel Margin="16,0,0,0"
