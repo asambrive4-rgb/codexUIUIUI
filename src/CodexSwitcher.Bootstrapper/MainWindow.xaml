@@ -16,13 +16,18 @@
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <Style x:Key="SkyCircleDummyButtonStyle" TargetType="{x:Type Button}">
             <Setter Property="Background" Value="#FFE0F2FE" />
-            <Setter Property="BorderBrush" Value="#FFBAE6FD" />
+            <Setter Property="BorderBrush" Value="#FF7DD3FC" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Width" Value="26" />
             <Setter Property="Height" Value="26" />
             <Setter Property="MinWidth" Value="26" />
             <Setter Property="MinHeight" Value="26" />
             <Setter Property="Padding" Value="0" />
+            <Setter Property="Content" Value="↙" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#FF0369A1" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -32,11 +37,23 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="13"
-                                SnapsToDevicePixels="True" />
+                                SnapsToDevicePixels="True">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="5"
+                                                  Color="#FF0369A1"
+                                                  Direction="270"
+                                                  Opacity="0.16"
+                                                  RenderingBias="Performance"
+                                                  ShadowDepth="1" />
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="border" Property="Background" Value="#FFBAE6FD" />
-                                <Setter TargetName="border" Property="BorderBrush" Value="#FF7DD3FC" />
+                                <Setter TargetName="border" Property="BorderBrush" Value="#FF38BDF8" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="border" Property="Background" Value="#FF7DD3FC" />
@@ -283,7 +300,8 @@
                             VerticalAlignment="Top"
                             Panel.ZIndex="1">
                         <Button Style="{StaticResource SkyCircleDummyButtonStyle}"
-                                AutomationProperties.Name="더미 버튼"
+                                AutomationProperties.Name="프로필 팝업 열기"
+                                Click="OpenProfilePopup_Click"
                                 Canvas.Left="0"
                                 Canvas.Top="1" />
                     </Canvas>

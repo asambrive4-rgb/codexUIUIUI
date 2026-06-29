@@ -48,6 +48,9 @@ public sealed class MainWindowViewModel : ObservableObject
     public ProfileListItemViewModel? ActiveProfile =>
         Profiles.FirstOrDefault(p => p.IsActive);
 
+    public ProfileListItemViewModel? DefaultPopupProfile =>
+        ActiveProfile ?? Profiles.FirstOrDefault();
+
     public bool HasActiveProfile => ActiveProfile is not null;
 
     public IEnumerable<ProfileListItemViewModel> InactiveProfiles =>

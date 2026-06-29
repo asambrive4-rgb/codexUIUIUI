@@ -14,20 +14,24 @@ public partial class MainWindow : FluentWindow
     private readonly MainWindowViewModel _viewModel;
     private readonly CreateProfileLoginUseCase _profileLogin;
     private readonly ProfileUsageMonitor _usageMonitor;
+    private readonly PopupPlacementStore _popupPlacementStore;
     private CancellationTokenSource? _monitorCancellation;
     private IDisposable? _usageSurfaceLease;
+    private ProfilePopupWindow? _profilePopupWindow;
     private bool _usageMonitoringStarted;
     private bool _allowApplicationExit;
 
     public MainWindow(
         MainWindowViewModel viewModel,
         CreateProfileLoginUseCase profileLogin,
-        ProfileUsageMonitor usageMonitor)
+        ProfileUsageMonitor usageMonitor,
+        PopupPlacementStore popupPlacementStore)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _profileLogin = profileLogin;
         _usageMonitor = usageMonitor;
+        _popupPlacementStore = popupPlacementStore;
         DataContext = viewModel;
         IsVisibleChanged += MainWindow_IsVisibleChanged;
     }
@@ -58,6 +62,45 @@ public partial class MainWindow : FluentWindow
 
     public bool IsOperationInProgress =>
         _viewModel.IsOperationInProgress;
+
+    public void ReturnToMainWindow()
+    {
+        Show();
+        RestoreAndActivate();
+        CloseProfilePopup();
+        UpdateUsageSurfaceRegistration();
+    }
+
+    public void ShowDefaultSurface()
+    {
+        if (_viewModel.DefaultPopupProfile is null)
+        {
+            Show();
+            RestoreAndActivate();
+            UpdateUsageSurfaceRegistration();
+            return;
+        }
+
+        OpenProfilePopup(_viewModel.DefaultPopupProfile);
+    }
+
+    public void RestoreCompactSurface()
+    {
+        if (_profilePopupWindow?.IsVisible == true)
+        {
+            _profilePopupWindow.RestoreAndActivate();
+            return;
+        }
+
+        if (!IsVisible &&
+            _viewModel.DefaultPopupProfile is not null)
+        {
+            OpenProfilePopup(_viewModel.DefaultPopupProfile);
+            return;
+        }
+
+        ReturnToMainWindow();
+    }
 
     public void AllowApplicationExit()
     {
@@ -235,6 +278,21 @@ public partial class MainWindow : FluentWindow
             CancellationToken.None);
     }
 
+    private void OpenProfilePopup_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement
+            {
+                DataContext: ProfileListItemViewModel profile
+            })
+        {
+            return;
+        }
+
+        OpenProfilePopup(profile);
+    }
+
     private void ManageButton_Click(
         object sender,
         RoutedEventArgs e)
@@ -266,6 +324,7 @@ public partial class MainWindow : FluentWindow
         IsVisibleChanged -= MainWindow_IsVisibleChanged;
         _usageMonitor.SnapshotChanged -= OnUsageSnapshotChanged;
         _usageMonitor.RefreshingChanged -= OnUsageRefreshingChanged;
+        CloseProfilePopup();
         _usageSurfaceLease?.Dispose();
         _usageSurfaceLease = null;
         _monitorCancellation?.Cancel();
@@ -299,7 +358,8 @@ public partial class MainWindow : FluentWindow
             return;
         }
 
-        if (IsVisible)
+        if (IsVisible ||
+            _profilePopupWindow?.IsVisible == true)
         {
             _usageSurfaceLease ??=
                 _usageMonitor.AcquireVisibleSurface();
@@ -324,6 +384,82 @@ public partial class MainWindow : FluentWindow
     {
         _ = Dispatcher.InvokeAsync(
             () => _viewModel.SetUsageRefreshing(isRefreshing));
+    }
+
+    private void ProfilePopupWindow_ReturnRequested(
+        object? sender,
+        EventArgs e) =>
+        ReturnToMainWindow();
+
+    private void ProfilePopupWindow_MinimizeRequested(
+        object? sender,
+        EventArgs e)
+    {
+        CloseProfilePopup();
+        Hide();
+        UpdateUsageSurfaceRegistration();
+    }
+
+    private void ProfilePopupWindow_Closed(
+        object? sender,
+        EventArgs e)
+    {
+        if (sender is not ProfilePopupWindow popup ||
+            popup != _profilePopupWindow)
+        {
+            return;
+        }
+
+        popup.ReturnRequested -= ProfilePopupWindow_ReturnRequested;
+        popup.MinimizeRequested -= ProfilePopupWindow_MinimizeRequested;
+        popup.Closed -= ProfilePopupWindow_Closed;
+        _profilePopupWindow = null;
+        UpdateUsageSurfaceRegistration();
+    }
+
+    private void CloseProfilePopup()
+    {
+        if (_profilePopupWindow is null)
+        {
+            return;
+        }
+
+        var popup = _profilePopupWindow;
+        popup.ReturnRequested -= ProfilePopupWindow_ReturnRequested;
+        popup.MinimizeRequested -= ProfilePopupWindow_MinimizeRequested;
+        popup.Closed -= ProfilePopupWindow_Closed;
+        _profilePopupWindow = null;
+        popup.Close();
+    }
+
+    private void OpenProfilePopup(ProfileListItemViewModel profile)
+    {
+        CloseProfilePopup();
+
+        var popup = new ProfilePopupWindow(
+            profile,
+            _popupPlacementStore);
+        popup.ReturnRequested += ProfilePopupWindow_ReturnRequested;
+        popup.MinimizeRequested += ProfilePopupWindow_MinimizeRequested;
+        popup.Closed += ProfilePopupWindow_Closed;
+        _profilePopupWindow = popup;
+        popup.Show();
+        Hide();
+        popup.RestoreAndActivate();
+        UpdateUsageSurfaceRegistration();
+    }
+
+    private void RestoreAndActivate()
+    {
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        _ = Activate();
+        Topmost = true;
+        Topmost = false;
+        _ = Focus();
     }
 
     private async Task MonitorRuntimeAsync(

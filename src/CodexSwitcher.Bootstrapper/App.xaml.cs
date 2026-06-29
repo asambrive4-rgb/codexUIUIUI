@@ -92,17 +92,18 @@ public partial class App : Application
             switchProfile,
             deleteProfile,
             getRuntimeState);
+        var popupPlacementStore = new PopupPlacementStore();
         var window = new MainWindow(
             viewModel,
             profileLogin,
-            usageMonitor);
+            usageMonitor,
+            popupPlacementStore);
 
         _viewModel = viewModel;
         _usageMonitor = usageMonitor;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         MainWindow = window;
-        window.Show();
 
         _trayIcon = new TrayIconService(
             () => Dispatcher.BeginInvoke(
@@ -114,6 +115,7 @@ public partial class App : Application
         await viewModel.InitializeAsync(CancellationToken.None);
         window.StartRuntimeMonitoring();
         window.StartUsageMonitoring();
+        window.ShowDefaultSurface();
     }
 
     protected override void OnSessionEnding(
@@ -161,12 +163,7 @@ public partial class App : Application
             return;
         }
 
-        if (!mainWindow.IsVisible)
-        {
-            mainWindow.Show();
-        }
-
-        RestoreAndActivate(mainWindow);
+        mainWindow.RestoreCompactSurface();
 
         var dialog = Windows
             .OfType<Window>()
@@ -174,6 +171,12 @@ public partial class App : Application
                 window =>
                     window != mainWindow &&
                     window.IsVisible);
+        if (dialog is ProfilePopupWindow popup)
+        {
+            popup.RestoreAndActivate();
+            return;
+        }
+
         if (dialog is not null)
         {
             RestoreAndActivate(dialog);
@@ -193,6 +196,7 @@ public partial class App : Application
             .LastOrDefault(
                 window =>
                     window != mainWindow &&
+                    window is not ProfilePopupWindow &&
                     window.IsVisible);
         if (openDialog is not null)
         {

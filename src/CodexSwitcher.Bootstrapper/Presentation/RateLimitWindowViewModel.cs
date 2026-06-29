@@ -19,6 +19,7 @@ public sealed class RateLimitWindowViewModel : ObservableObject
     private int _remainingPercent;
     private Brush _progressBrush = DeadBrush;
     private string _resetTimeText = "정보 없음";
+    private string _popupResetText = "--";
     private bool _isDataAvailable;
 
     public RateLimitWindowViewModel(string label)
@@ -40,6 +41,12 @@ public sealed class RateLimitWindowViewModel : ObservableObject
     {
         get => _resetTimeText;
         private set => SetField(ref _resetTimeText, value);
+    }
+
+    public string PopupResetText
+    {
+        get => _popupResetText;
+        private set => SetField(ref _popupResetText, value);
     }
 
     public bool IsDataAvailable
@@ -75,6 +82,7 @@ public sealed class RateLimitWindowViewModel : ObservableObject
             DisplayText = $"{Label} · 정보 없음";
             AutomationName = $"{Label} · 정보 없음";
             ResetTimeText = "정보 없음";
+            PopupResetText = "--";
             IsDataAvailable = false;
             return;
         }
@@ -91,6 +99,7 @@ public sealed class RateLimitWindowViewModel : ObservableObject
 
         var resetText = DescribeReset(window.ResetsAt);
         ResetTimeText = resetText;
+        PopupResetText = DescribePopupReset(window.ResetsAt);
 
         if (RemainingPercent == 0)
         {
@@ -125,6 +134,28 @@ public sealed class RateLimitWindowViewModel : ObservableObject
         {
             return localTime.ToString("M월 d일 HH:mm");
         }
+    }
+
+    private string DescribePopupReset(DateTimeOffset? resetsAt)
+    {
+        if (resetsAt is null)
+        {
+            return "--";
+        }
+
+        var remaining = resetsAt.Value - DateTimeOffset.Now;
+        if (remaining <= TimeSpan.Zero)
+        {
+            return "곧";
+        }
+
+        var localTime = resetsAt.Value.ToLocalTime();
+        if (Label == "5시간 한도")
+        {
+            return localTime.ToString("HH:mm");
+        }
+
+        return localTime.ToString("M월 d일");
     }
 
     private static Brush CreateBrush(

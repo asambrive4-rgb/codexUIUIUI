@@ -215,6 +215,39 @@ public sealed class ProfilePresentationTests
     }
 
     [TestMethod]
+    public void PopupRateLimit_UsesCompactResetText()
+    {
+        var fiveHour = new RateLimitWindowViewModel("5시간 한도");
+        var weekly = new RateLimitWindowViewModel("주간 한도");
+        var resetTime = new DateTimeOffset(
+            2026,
+            6,
+            29,
+            20,
+            15,
+            0,
+            TimeSpan.Zero).ToLocalTime();
+
+        fiveHour.Apply(
+            new RateLimitWindow(
+                UsedPercent: 20,
+                WindowDurationMinutes: 300,
+                ResetsAt: resetTime));
+        weekly.Apply(
+            new RateLimitWindow(
+                UsedPercent: 20,
+                WindowDurationMinutes: 10080,
+                ResetsAt: resetTime));
+
+        Assert.AreEqual(
+            resetTime.ToString("HH:mm"),
+            fiveHour.PopupResetText);
+        Assert.AreEqual(
+            resetTime.ToString("M월 d일"),
+            weekly.PopupResetText);
+    }
+
+    [TestMethod]
     public void OperationFormatter_PreservesRepresentativeMessages()
     {
         Assert.AreEqual(
