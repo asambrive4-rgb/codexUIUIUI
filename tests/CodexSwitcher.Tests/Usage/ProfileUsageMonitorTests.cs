@@ -41,6 +41,40 @@ public sealed class ProfileUsageMonitorTests
             reader.KeepAliveValues);
     }
 
+    [TestMethod]
+    public async Task Monitor_InitialRefresh_DoesNotRepublishUnchangedSnapshot()
+    {
+        var store = new StubProfileStore(
+            new Profile(
+                ProfileId.New(),
+                ProfileName.Create("A")));
+        var reader = new RecordingRateLimitReader();
+        using var monitor = new ProfileUsageMonitor(
+            new ListProfilesUseCase(store),
+            new GetProfileRuntimeStateUseCase(
+                store,
+                new UnknownAuthenticationSession(),
+                new RunningCodexController()),
+            new RefreshProfileRateLimitUseCase(
+                store,
+                reader,
+                new ProfileOperationCoordinator()),
+            reader);
+        var snapshotCount = 0;
+        monitor.SnapshotChanged += (_, _) =>
+            Interlocked.Increment(ref snapshotCount);
+
+        using var surface = monitor.AcquireVisibleSurface();
+        await WaitUntilAsync(
+            () => reader.CallCount >= 1,
+            TimeSpan.FromSeconds(2));
+        await Task.Delay(50);
+
+        Assert.AreEqual(
+            2,
+            Volatile.Read(ref snapshotCount));
+    }
+
     private static async Task WaitUntilAsync(
         Func<bool> condition,
         TimeSpan timeout)

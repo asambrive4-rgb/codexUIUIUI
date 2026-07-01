@@ -4,10 +4,17 @@ namespace CodexSwitcher.Core.Profiles;
 
 public sealed class GetProfileRuntimeStateUseCase
 {
+    private static readonly TimeSpan RunningStateCacheDuration =
+        TimeSpan.FromSeconds(5);
+
     private readonly IProfileStore _profileStore;
     private readonly IAuthenticationSession _authenticationSession;
     private readonly ICodexLoginController _codexController;
     private readonly ICredentialIdentityReader _identityReader;
+    private readonly TimeProvider _timeProvider;
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
+    private readonly object _cacheGate = new();
+    private CachedRuntimeState? _cachedState;
 
     public GetProfileRuntimeStateUseCase(
         IProfileStore profileStore,
@@ -26,22 +33,76 @@ public sealed class GetProfileRuntimeStateUseCase
         IAuthenticationSession authenticationSession,
         ICodexLoginController codexController,
         ICredentialIdentityReader identityReader)
+        : this(
+            profileStore,
+            authenticationSession,
+            codexController,
+            identityReader,
+            TimeProvider.System)
+    {
+    }
+
+    public GetProfileRuntimeStateUseCase(
+        IProfileStore profileStore,
+        IAuthenticationSession authenticationSession,
+        ICodexLoginController codexController,
+        ICredentialIdentityReader identityReader,
+        TimeProvider timeProvider)
     {
         _profileStore = profileStore;
         _authenticationSession = authenticationSession;
         _codexController = codexController;
         _identityReader = identityReader;
+        _timeProvider = timeProvider;
     }
 
+    public Task<ProfileRuntimeState> ExecuteAsync(
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            forceRefresh: false,
+            cancellationToken);
+
     public async Task<ProfileRuntimeState> ExecuteAsync(
+        bool forceRefresh,
         CancellationToken cancellationToken)
     {
         if (!await _codexController.IsRunningAsync(cancellationToken))
         {
-            return new ProfileRuntimeState(
+            var stopped = new ProfileRuntimeState(
                 ProfileRuntimeStatus.Stopped);
+            Cache(stopped);
+            return stopped;
         }
 
+        var cached = GetFreshCachedRunningState(forceRefresh);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        await _refreshGate.WaitAsync(cancellationToken);
+        try
+        {
+            cached = GetFreshCachedRunningState(forceRefresh);
+            if (cached is not null)
+            {
+                return cached;
+            }
+
+            var refreshed = await ResolveRunningStateAsync(
+                cancellationToken);
+            Cache(refreshed);
+            return refreshed;
+        }
+        finally
+        {
+            _refreshGate.Release();
+        }
+    }
+
+    private async Task<ProfileRuntimeState> ResolveRunningStateAsync(
+        CancellationToken cancellationToken)
+    {
         byte[]? currentCredential = null;
         try
         {
@@ -130,8 +191,46 @@ public sealed class GetProfileRuntimeStateUseCase
         }
     }
 
+    private ProfileRuntimeState? GetFreshCachedRunningState(
+        bool forceRefresh)
+    {
+        if (forceRefresh)
+        {
+            return null;
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        lock (_cacheGate)
+        {
+            if (_cachedState is null ||
+                _cachedState.State.Status ==
+                ProfileRuntimeStatus.Stopped ||
+                now - _cachedState.CapturedAt >
+                RunningStateCacheDuration)
+            {
+                return null;
+            }
+
+            return _cachedState.State;
+        }
+    }
+
+    private void Cache(ProfileRuntimeState state)
+    {
+        lock (_cacheGate)
+        {
+            _cachedState = new CachedRuntimeState(
+                state,
+                _timeProvider.GetUtcNow());
+        }
+    }
+
     private static ProfileRuntimeState Unknown() =>
         new(ProfileRuntimeStatus.RunningUnknownProfile);
+
+    private sealed record CachedRuntimeState(
+        ProfileRuntimeState State,
+        DateTimeOffset CapturedAt);
 
     private sealed class NoCredentialIdentityReader
         : ICredentialIdentityReader

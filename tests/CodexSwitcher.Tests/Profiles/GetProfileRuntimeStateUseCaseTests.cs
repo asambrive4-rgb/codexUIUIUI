@@ -127,6 +127,141 @@ public sealed class GetProfileRuntimeStateUseCaseTests
             result.Status);
     }
 
+    [TestMethod]
+    public async Task Execute_WhenRunningStateIsCached_DoesNotRepeatCredentialReads()
+    {
+        var fixture = new Fixture();
+        var matching = fixture.AddProfile(
+            "Work",
+            "current"u8.ToArray());
+        fixture.Authentication.CurrentCredential =
+            "current"u8.ToArray();
+
+        var first = await fixture.UseCase.ExecuteAsync(
+            CancellationToken.None);
+        fixture.Authentication.CurrentCredential =
+            "changed-outside-cache"u8.ToArray();
+        var second = await fixture.UseCase.ExecuteAsync(
+            CancellationToken.None);
+
+        Assert.AreEqual(
+            ProfileRuntimeStatus.RunningKnownProfile,
+            first.Status);
+        Assert.AreEqual(
+            ProfileRuntimeStatus.RunningKnownProfile,
+            second.Status);
+        Assert.AreEqual(matching.Id, second.ActiveProfileId);
+        Assert.AreEqual(2, fixture.Codex.IsRunningReadCount);
+        Assert.AreEqual(1, fixture.Authentication.ReadCount);
+        Assert.AreEqual(1, fixture.Store.ReadAllCount);
+        Assert.AreEqual(1, fixture.Store.ReadCredentialCount);
+    }
+
+    [TestMethod]
+    public async Task Execute_WithForceRefresh_RechecksCachedRunningState()
+    {
+        var fixture = new Fixture();
+        _ = fixture.AddProfile(
+            "Work",
+            "current"u8.ToArray());
+        fixture.Authentication.CurrentCredential =
+            "current"u8.ToArray();
+        _ = await fixture.UseCase.ExecuteAsync(
+            CancellationToken.None);
+
+        fixture.Authentication.CurrentCredential =
+            "changed"u8.ToArray();
+        var refreshed = await fixture.UseCase.ExecuteAsync(
+            forceRefresh: true,
+            CancellationToken.None);
+
+        Assert.AreEqual(
+            ProfileRuntimeStatus.RunningUnknownProfile,
+            refreshed.Status);
+        Assert.AreEqual(2, fixture.Authentication.ReadCount);
+        Assert.AreEqual(2, fixture.Store.ReadAllCount);
+        Assert.AreEqual(2, fixture.Store.ReadCredentialCount);
+    }
+
+    [TestMethod]
+    public async Task Execute_AfterCacheExpires_RechecksRunningState()
+    {
+        var fixture = new Fixture();
+        _ = fixture.AddProfile(
+            "Work",
+            "current"u8.ToArray());
+        fixture.Authentication.CurrentCredential =
+            "current"u8.ToArray();
+        _ = await fixture.UseCase.ExecuteAsync(
+            CancellationToken.None);
+
+        fixture.Authentication.CurrentCredential =
+            "changed"u8.ToArray();
+        fixture.Time.Advance(TimeSpan.FromSeconds(6));
+        var refreshed = await fixture.UseCase.ExecuteAsync(
+            CancellationToken.None);
+
+        Assert.AreEqual(
+            ProfileRuntimeStatus.RunningUnknownProfile,
+            refreshed.Status);
+        Assert.AreEqual(2, fixture.Authentication.ReadCount);
+        Assert.AreEqual(2, fixture.Store.ReadAllCount);
+        Assert.AreEqual(2, fixture.Store.ReadCredentialCount);
+    }
+
+    [TestMethod]
+    public async Task Execute_WhenCodexStops_ReturnsStoppedWithoutCredentialRead()
+    {
+        var fixture = new Fixture();
+        _ = fixture.AddProfile(
+            "Work",
+            "current"u8.ToArray());
+        fixture.Authentication.CurrentCredential =
+            "current"u8.ToArray();
+        _ = await fixture.UseCase.ExecuteAsync(
+            CancellationToken.None);
+
+        fixture.Codex.IsRunning = false;
+        var stopped = await fixture.UseCase.ExecuteAsync(
+            CancellationToken.None);
+
+        Assert.AreEqual(
+            ProfileRuntimeStatus.Stopped,
+            stopped.Status);
+        Assert.AreEqual(1, fixture.Authentication.ReadCount);
+        Assert.AreEqual(1, fixture.Store.ReadAllCount);
+        Assert.AreEqual(1, fixture.Store.ReadCredentialCount);
+    }
+
+    [TestMethod]
+    public async Task Execute_WhenCodexRestartsAfterStopped_RechecksRunningState()
+    {
+        var fixture = new Fixture();
+        _ = fixture.AddProfile(
+            "Work",
+            "current"u8.ToArray());
+        fixture.Authentication.CurrentCredential =
+            "current"u8.ToArray();
+        _ = await fixture.UseCase.ExecuteAsync(
+            CancellationToken.None);
+
+        fixture.Codex.IsRunning = false;
+        _ = await fixture.UseCase.ExecuteAsync(
+            CancellationToken.None);
+        fixture.Codex.IsRunning = true;
+        fixture.Authentication.CurrentCredential =
+            "changed"u8.ToArray();
+        var restarted = await fixture.UseCase.ExecuteAsync(
+            CancellationToken.None);
+
+        Assert.AreEqual(
+            ProfileRuntimeStatus.RunningUnknownProfile,
+            restarted.Status);
+        Assert.AreEqual(2, fixture.Authentication.ReadCount);
+        Assert.AreEqual(2, fixture.Store.ReadAllCount);
+        Assert.AreEqual(2, fixture.Store.ReadCredentialCount);
+    }
+
     private sealed class Fixture
     {
         public Fixture()
@@ -135,11 +270,13 @@ public sealed class GetProfileRuntimeStateUseCaseTests
             Authentication = new StubAuthenticationSession();
             Codex = new StubCodexController();
             Identity = new StubCredentialIdentityReader();
+            Time = new ManualTimeProvider();
             UseCase = new GetProfileRuntimeStateUseCase(
                 Store,
                 Authentication,
                 Codex,
-                Identity);
+                Identity,
+                Time);
         }
 
         public StubProfileStore Store { get; }
@@ -149,6 +286,8 @@ public sealed class GetProfileRuntimeStateUseCaseTests
         public StubCodexController Codex { get; }
 
         public StubCredentialIdentityReader Identity { get; }
+
+        public ManualTimeProvider Time { get; }
 
         public GetProfileRuntimeStateUseCase UseCase { get; }
 
@@ -184,9 +323,14 @@ public sealed class GetProfileRuntimeStateUseCaseTests
 
         public Dictionary<ProfileId, byte[]> Credentials { get; } = [];
 
+        public int ReadAllCount { get; private set; }
+
+        public int ReadCredentialCount { get; private set; }
+
         public Task<ProfileStoreReadResult> ReadAllAsync(
             CancellationToken cancellationToken)
         {
+            ReadAllCount++;
             return Task.FromResult(
                 new ProfileStoreReadResult(
                     Profiles.ToArray(),
@@ -205,6 +349,7 @@ public sealed class GetProfileRuntimeStateUseCaseTests
             ProfileId profileId,
             CancellationToken cancellationToken)
         {
+            ReadCredentialCount++;
             return Task.FromResult(
                 Credentials[profileId].ToArray());
         }
@@ -268,9 +413,12 @@ public sealed class GetProfileRuntimeStateUseCaseTests
     {
         public bool IsRunning { get; set; } = true;
 
+        public int IsRunningReadCount { get; private set; }
+
         public Task<bool> IsRunningAsync(
             CancellationToken cancellationToken)
         {
+            IsRunningReadCount++;
             return Task.FromResult(IsRunning);
         }
 
@@ -296,6 +444,19 @@ public sealed class GetProfileRuntimeStateUseCaseTests
             CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private DateTimeOffset _utcNow =
+            new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+
+        public void Advance(TimeSpan offset)
+        {
+            _utcNow += offset;
         }
     }
 }

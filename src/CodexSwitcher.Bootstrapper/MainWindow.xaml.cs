@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using CodexSwitcher.Bootstrapper.Presentation;
 using CodexSwitcher.Bootstrapper.Usage;
 using CodexSwitcher.Core.Profiles;
@@ -15,11 +16,15 @@ public partial class MainWindow : FluentWindow
     private readonly CreateProfileLoginUseCase _profileLogin;
     private readonly ProfileUsageMonitor _usageMonitor;
     private readonly PopupPlacementStore _popupPlacementStore;
+    private readonly object _usageSnapshotGate = new();
+    private readonly Dictionary<ProfileId, ProfileRateLimitSnapshot>
+        _pendingUsageSnapshots = [];
     private CancellationTokenSource? _monitorCancellation;
     private IDisposable? _usageSurfaceLease;
     private ProfilePopupWindow? _profilePopupWindow;
     private bool _usageMonitoringStarted;
     private bool _allowApplicationExit;
+    private bool _usageSnapshotDrainScheduled;
 
     public MainWindow(
         MainWindowViewModel viewModel,
@@ -327,6 +332,12 @@ public partial class MainWindow : FluentWindow
         CloseProfilePopup();
         _usageSurfaceLease?.Dispose();
         _usageSurfaceLease = null;
+        lock (_usageSnapshotGate)
+        {
+            _pendingUsageSnapshots.Clear();
+            _usageSnapshotDrainScheduled = false;
+        }
+
         _monitorCancellation?.Cancel();
         _monitorCancellation?.Dispose();
         _monitorCancellation = null;
@@ -374,8 +385,36 @@ public partial class MainWindow : FluentWindow
         object? sender,
         ProfileRateLimitSnapshot snapshot)
     {
+        lock (_usageSnapshotGate)
+        {
+            _pendingUsageSnapshots[snapshot.ProfileId] = snapshot;
+            if (_usageSnapshotDrainScheduled)
+            {
+                return;
+            }
+
+            _usageSnapshotDrainScheduled = true;
+        }
+
         _ = Dispatcher.InvokeAsync(
-            () => _viewModel.ApplyUsageSnapshot(snapshot));
+            DrainUsageSnapshots,
+            DispatcherPriority.Background);
+    }
+
+    private void DrainUsageSnapshots()
+    {
+        ProfileRateLimitSnapshot[] snapshots;
+        lock (_usageSnapshotGate)
+        {
+            snapshots = _pendingUsageSnapshots.Values.ToArray();
+            _pendingUsageSnapshots.Clear();
+            _usageSnapshotDrainScheduled = false;
+        }
+
+        foreach (var snapshot in snapshots)
+        {
+            _viewModel.ApplyUsageSnapshot(snapshot);
+        }
     }
 
     private void OnUsageRefreshingChanged(

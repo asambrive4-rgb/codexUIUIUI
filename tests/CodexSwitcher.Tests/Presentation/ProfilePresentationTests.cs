@@ -194,14 +194,7 @@ public sealed class ProfilePresentationTests
     public void WeeklyRateLimit_ShowsResetDateAndTime()
     {
         var viewModel = new RateLimitWindowViewModel("주간 한도");
-        var resetTime = new DateTimeOffset(
-            2026,
-            6,
-            29,
-            20,
-            15,
-            0,
-            TimeSpan.Zero).ToLocalTime();
+        var resetTime = DateTimeOffset.Now.AddDays(14);
 
         viewModel.Apply(
             new RateLimitWindow(
@@ -219,14 +212,7 @@ public sealed class ProfilePresentationTests
     {
         var fiveHour = new RateLimitWindowViewModel("5시간 한도");
         var weekly = new RateLimitWindowViewModel("주간 한도");
-        var resetTime = new DateTimeOffset(
-            2026,
-            6,
-            29,
-            20,
-            15,
-            0,
-            TimeSpan.Zero).ToLocalTime();
+        var resetTime = DateTimeOffset.Now.AddDays(14);
 
         fiveHour.Apply(
             new RateLimitWindow(

@@ -115,6 +115,59 @@ public sealed class MainWindowViewModelTests
             fixture.ViewModel.Profiles.Single().IsDeleteEnabled);
     }
 
+    [TestMethod]
+    public async Task RefreshRuntimeState_WhenStateIsUnchanged_DoesNotNotifyProfileCollections()
+    {
+        var fixture = new Fixture();
+        fixture.Codex.IsRunning = true;
+        fixture.Authentication.CurrentCredential =
+            fixture.TargetCredential.ToArray();
+        await fixture.ViewModel.InitializeAsync(CancellationToken.None);
+
+        var changedProperties = new List<string?>();
+        fixture.ViewModel.PropertyChanged += (_, e) =>
+            changedProperties.Add(e.PropertyName);
+
+        await fixture.ViewModel.RefreshRuntimeStateAsync(
+            CancellationToken.None);
+
+        Assert.DoesNotContain(
+            nameof(MainWindowViewModel.ActiveProfile),
+            changedProperties);
+        Assert.DoesNotContain(
+            nameof(MainWindowViewModel.HasActiveProfile),
+            changedProperties);
+        Assert.DoesNotContain(
+            nameof(MainWindowViewModel.InactiveProfiles),
+            changedProperties);
+    }
+
+    [TestMethod]
+    public async Task SwitchProfile_AfterCachedRuntimeState_RechecksAndMarksNewActiveProfile()
+    {
+        var fixture = new Fixture();
+        var personal = fixture.AddProfile(
+            "Personal",
+            "personal"u8.ToArray());
+        fixture.Codex.IsRunning = true;
+        fixture.Authentication.CurrentCredential =
+            fixture.TargetCredential.ToArray();
+        await fixture.ViewModel.InitializeAsync(CancellationToken.None);
+
+        Assert.AreEqual(
+            fixture.Profile.Id,
+            fixture.ViewModel.ActiveProfile?.Id);
+
+        var result = await fixture.ViewModel.SwitchProfileAsync(
+            personal.Id,
+            CancellationToken.None);
+
+        Assert.AreEqual(SwitchProfileStatus.Switched, result.Status);
+        Assert.AreEqual(
+            personal.Id,
+            fixture.ViewModel.ActiveProfile?.Id);
+    }
+
     private sealed class Fixture
     {
         public Fixture()
@@ -176,6 +229,18 @@ public sealed class MainWindowViewModelTests
         public StubCodexController Codex { get; } = new();
 
         public MainWindowViewModel ViewModel { get; }
+
+        public Profile AddProfile(
+            string name,
+            byte[] credential)
+        {
+            var profile = new Profile(
+                ProfileId.New(),
+                ProfileName.Create(name));
+            Store.Profiles.Add(profile);
+            Store.Credentials[profile.Id] = credential;
+            return profile;
+        }
     }
 
     private sealed class StubInstallationLocator

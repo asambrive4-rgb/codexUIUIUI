@@ -13,6 +13,8 @@ public sealed class ProfileUsageMonitor : IDisposable
     private readonly object _stateGate = new();
     private readonly Dictionary<ProfileId, ProfileRateLimitSnapshot>
         _snapshots = [];
+    private readonly Dictionary<ProfileId, ProfileRateLimitSnapshot>
+        _publishedSnapshots = [];
     private readonly Dictionary<ProfileId, DateTimeOffset>
         _lastAttempts = [];
     private readonly Dictionary<ProfileId, int> _consecutiveFailures = [];
@@ -373,8 +375,10 @@ public sealed class ProfileUsageMonitor : IDisposable
             previous?.WeeklyLimit,
             previous?.LastSuccessfulAt);
         _snapshots[profileId] = loading;
-        UsageMonitorDiagnostics.Write("loading snapshot published");
-        SnapshotChanged?.Invoke(this, loading);
+        if (PublishIfChanged(loading))
+        {
+            UsageMonitorDiagnostics.Write("loading snapshot published");
+        }
     }
 
     private void ApplyRefreshResult(
@@ -409,11 +413,11 @@ public sealed class ProfileUsageMonitor : IDisposable
                     previous?.LastSuccessfulAt);
         }
 
-        SnapshotChanged?.Invoke(
-            this,
-            _snapshots[refreshed.ProfileId]);
-        UsageMonitorDiagnostics.Write(
-            $"snapshot published status={_snapshots[refreshed.ProfileId].Status}");
+        if (PublishIfChanged(_snapshots[refreshed.ProfileId]))
+        {
+            UsageMonitorDiagnostics.Write(
+                $"snapshot published status={_snapshots[refreshed.ProfileId].Status}");
+        }
     }
 
     private void RemoveDeletedProfiles(
@@ -427,6 +431,7 @@ public sealed class ProfileUsageMonitor : IDisposable
                      .ToArray())
         {
             _snapshots.Remove(profileId);
+            _publishedSnapshots.Remove(profileId);
             _lastAttempts.Remove(profileId);
             _consecutiveFailures.Remove(profileId);
         }
@@ -438,7 +443,7 @@ public sealed class ProfileUsageMonitor : IDisposable
                 profileId,
                 out var snapshot))
         {
-            SnapshotChanged?.Invoke(this, snapshot);
+            PublishIfChanged(snapshot);
         }
     }
 
@@ -446,8 +451,23 @@ public sealed class ProfileUsageMonitor : IDisposable
     {
         foreach (var snapshot in _snapshots.Values)
         {
-            SnapshotChanged?.Invoke(this, snapshot);
+            PublishIfChanged(snapshot);
         }
+    }
+
+    private bool PublishIfChanged(ProfileRateLimitSnapshot snapshot)
+    {
+        if (_publishedSnapshots.TryGetValue(
+                snapshot.ProfileId,
+                out var previous) &&
+            previous == snapshot)
+        {
+            return false;
+        }
+
+        _publishedSnapshots[snapshot.ProfileId] = snapshot;
+        SnapshotChanged?.Invoke(this, snapshot);
+        return true;
     }
 
     private sealed class Lease : IDisposable

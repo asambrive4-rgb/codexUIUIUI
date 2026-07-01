@@ -16,6 +16,8 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly GetProfileRuntimeStateUseCase _getRuntimeState;
     private readonly ProfileListPresentationState _profileList = new();
     private readonly SemaphoreSlim _runtimeRefreshGate = new(1, 1);
+    private ProfileRuntimeState? _lastRuntimeState;
+    private bool? _lastRuntimeCanOperate;
     private string _installationStatusMessage = "확인 중";
     private string _profileStatusMessage = "프로필을 불러오는 중...";
     private string _runtimeStatusMessage = "Codex 상태 확인 중...";
@@ -23,6 +25,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool _hasPendingRecovery;
     private bool _isOperationInProgress;
     private bool _isUsageRefreshing;
+    private bool _isRuntimePresentationDirty = true;
 
     public MainWindowViewModel(
         DetectCodexInstallationUseCase detectInstallation,
@@ -122,7 +125,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public async Task InitializeAsync(
         CancellationToken cancellationToken)
     {
-        var result = await _detectInstallation.ExecuteAsync(
+        var result = await RunOffUiThreadAsync(
+            token => _detectInstallation.ExecuteAsync(token),
             cancellationToken);
         InstallationStatusMessage = result.Status switch
         {
@@ -139,23 +143,34 @@ public sealed class MainWindowViewModel : ObservableObject
     public async Task RefreshProfilesAsync(
         CancellationToken cancellationToken)
     {
-        var result = await _listProfiles.ExecuteAsync(
+        var result = await RunOffUiThreadAsync(
+            token => _listProfiles.ExecuteAsync(token),
             cancellationToken);
         _profileList.Replace(result.Profiles);
+        InvalidateRuntimePresentation();
         ProfileStatusMessage = result.Issues.Count > 0
             ? "일부 프로필 저장 데이터를 읽지 못했습니다. 새 프로필 추가 전에 저장소 확인이 필요합니다."
             : result.Profiles.Count == 0
                 ? "저장된 프로필이 없습니다."
                 : $"프로필 {result.Profiles.Count}개";
 
-        HasPendingRecovery =
-            await _profileLogin.HasPendingRecoveryAsync(
-                cancellationToken);
-        await RefreshRuntimeStateAsync(cancellationToken);
+        await RefreshRuntimeStateAsync(
+            cancellationToken,
+            forceApply: true,
+            forceRuntimeRefresh: true);
     }
 
-    public async Task RefreshRuntimeStateAsync(
-        CancellationToken cancellationToken)
+    public Task RefreshRuntimeStateAsync(
+        CancellationToken cancellationToken) =>
+        RefreshRuntimeStateAsync(
+            cancellationToken,
+            forceApply: false,
+            forceRuntimeRefresh: false);
+
+    private async Task RefreshRuntimeStateAsync(
+        CancellationToken cancellationToken,
+        bool forceApply,
+        bool forceRuntimeRefresh)
     {
         if (_isOperationInProgress ||
             !await _runtimeRefreshGate.WaitAsync(
@@ -167,14 +182,18 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            HasPendingRecovery =
-                await _profileLogin.HasPendingRecoveryAsync(
-                    cancellationToken);
-            var state = await _getRuntimeState.ExecuteAsync(
+            var result = await RunOffUiThreadAsync(
+                async token => new RuntimeRefreshResult(
+                    await _profileLogin.HasPendingRecoveryAsync(token),
+                    await _getRuntimeState.ExecuteAsync(
+                        forceRuntimeRefresh,
+                        token)),
                 cancellationToken);
-            RuntimeStatusMessage = _profileList.ApplyRuntimeState(
-                state,
-                CanOperateOnProfiles);
+
+            HasPendingRecovery = result.HasPendingRecovery;
+            ApplyRuntimePresentation(
+                result.State,
+                forceApply);
         }
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
@@ -186,11 +205,11 @@ public sealed class MainWindowViewModel : ObservableObject
             RuntimeStatusMessage =
                 "Codex 상태를 확인하지 못했습니다.";
             _profileList.DisableAllActions();
+            InvalidateRuntimePresentation();
         }
         finally
         {
             _runtimeRefreshGate.Release();
-            NotifyProfileCollectionsChanged();
         }
     }
 
@@ -205,7 +224,7 @@ public sealed class MainWindowViewModel : ObservableObject
             _runProfile.ExecuteAsync,
             result =>
                 ProfileOperationMessageFormatter.Describe(result.Status),
-            (_, token) => RefreshRuntimeStateAsync(token),
+            (_, token) => RefreshRuntimeStateAfterChangeAsync(token),
             cancellationToken);
 
     public Task<SwitchProfileResult> SwitchProfileAsync(
@@ -219,7 +238,7 @@ public sealed class MainWindowViewModel : ObservableObject
             _switchProfile.ExecuteAsync,
             result =>
                 ProfileOperationMessageFormatter.Describe(result.Status),
-            (_, token) => RefreshRuntimeStateAsync(token),
+            (_, token) => RefreshRuntimeStateAfterChangeAsync(token),
             cancellationToken);
 
     public Task<DeleteProfileResult> DeleteProfileAsync(
@@ -236,12 +255,19 @@ public sealed class MainWindowViewModel : ObservableObject
             (result, token) =>
                 result.Status == DeleteProfileStatus.Deleted
                     ? RefreshProfilesAsync(token)
-                    : RefreshRuntimeStateAsync(token),
+                    : RefreshRuntimeStateAfterChangeAsync(token),
             cancellationToken);
 
     private bool CanOperateOnProfiles =>
         !HasPendingRecovery &&
         !_isOperationInProgress;
+
+    private Task RefreshRuntimeStateAfterChangeAsync(
+        CancellationToken cancellationToken) =>
+        RefreshRuntimeStateAsync(
+            cancellationToken,
+            forceApply: true,
+            forceRuntimeRefresh: true);
 
     private async Task<TResult> ExecuteProfileOperationAsync<TResult>(
         ProfileId profileId,
@@ -260,13 +286,16 @@ public sealed class MainWindowViewModel : ObservableObject
 
         SetOperationInProgress(true);
         _profileList.BeginOperation(profileId, itemStatus);
+        InvalidateRuntimePresentation();
         NotifyProfileCollectionsChanged();
         OperationStatusMessage = operationStatus;
 
         TResult result;
         try
         {
-            result = await execute(profileId, cancellationToken);
+            result = await RunOffUiThreadAsync(
+                token => execute(profileId, token),
+                cancellationToken);
             OperationStatusMessage = describeResult(result);
         }
         finally
@@ -275,11 +304,57 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         HasPendingRecovery =
-            await _profileLogin.HasPendingRecoveryAsync(
+            await RunOffUiThreadAsync(
+                token => _profileLogin.HasPendingRecoveryAsync(token),
                 cancellationToken);
         await refreshAfter(result, cancellationToken);
         NotifyProfileCollectionsChanged();
         return result;
+    }
+
+    private void ApplyRuntimePresentation(
+        ProfileRuntimeState state,
+        bool forceApply)
+    {
+        var canOperate = CanOperateOnProfiles;
+        if (!forceApply &&
+            !_isRuntimePresentationDirty &&
+            _lastRuntimeCanOperate == canOperate &&
+            EqualityComparer<ProfileRuntimeState>.Default.Equals(
+                _lastRuntimeState,
+                state))
+        {
+            return;
+        }
+
+        var previousActiveProfileId = ActiveProfile?.Id;
+        RuntimeStatusMessage = _profileList.ApplyRuntimeState(
+            state,
+            canOperate);
+        _lastRuntimeState = state;
+        _lastRuntimeCanOperate = canOperate;
+        _isRuntimePresentationDirty = false;
+
+        if (forceApply ||
+            previousActiveProfileId != ActiveProfile?.Id)
+        {
+            NotifyProfileCollectionsChanged();
+        }
+    }
+
+    private void InvalidateRuntimePresentation()
+    {
+        _isRuntimePresentationDirty = true;
+    }
+
+    private static async Task<TResult> RunOffUiThreadAsync<TResult>(
+        Func<CancellationToken, Task<TResult>> action,
+        CancellationToken cancellationToken)
+    {
+        return await Task.Run(
+                () => action(cancellationToken),
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private void NotifyProfileCollectionsChanged()
@@ -300,4 +375,8 @@ public sealed class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CanAddProfile));
         OnPropertyChanged(nameof(IsOperationInProgress));
     }
+
+    private sealed record RuntimeRefreshResult(
+        bool HasPendingRecovery,
+        ProfileRuntimeState State);
 }
