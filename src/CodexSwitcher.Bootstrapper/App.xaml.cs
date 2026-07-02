@@ -93,6 +93,8 @@ public partial class App : Application
             deleteProfile,
             getRuntimeState);
         var popupPlacementStore = new PopupPlacementStore();
+        var popupPlacementLoad =
+            popupPlacementStore.LoadAsync(CancellationToken.None);
         var window = new MainWindow(
             viewModel,
             profileLogin,
@@ -112,7 +114,9 @@ public partial class App : Application
                 RequestApplicationExit));
         _trayIcon.UpdateStatus(viewModel.RuntimeStatusMessage);
 
-        await viewModel.InitializeAsync(CancellationToken.None);
+        await Task.WhenAll(
+            viewModel.InitializeAsync(CancellationToken.None),
+            popupPlacementLoad);
         window.StartRuntimeMonitoring();
         window.StartUsageMonitoring();
         window.ShowDefaultSurface();

@@ -34,9 +34,12 @@ public partial class ProfilePopupWindow : Window
             WindowState = WindowState.Normal;
         }
 
-        Topmost = false;
         Topmost = true;
-        _ = Activate();
+        if (!IsActive)
+        {
+            _ = Activate();
+        }
+
         _ = Focus();
     }
 
@@ -70,7 +73,10 @@ public partial class ProfilePopupWindow : Window
         try
         {
             DragMove();
-            _placementStore.Save(Left, Top);
+            _ = _placementStore.SaveAsync(
+                Left,
+                Top,
+                CancellationToken.None);
         }
         catch (InvalidOperationException)
         {
@@ -93,7 +99,7 @@ public partial class ProfilePopupWindow : Window
             new Point(workingArea.Right, workingArea.Bottom));
         var popupWidth = ActualWidth > 0 ? ActualWidth : Width;
         var popupHeight = ActualHeight > 0 ? ActualHeight : Height;
-        var saved = _placementStore.Read();
+        var saved = _placementStore.ReadCached();
 
         if (saved is not null)
         {

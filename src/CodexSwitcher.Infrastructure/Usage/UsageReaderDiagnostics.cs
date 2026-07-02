@@ -2,10 +2,17 @@ namespace CodexSwitcher.Infrastructure.Usage;
 
 internal static class UsageReaderDiagnostics
 {
+    private static readonly bool IsEnabled =
+        IsDiagnosticsEnabled();
     private static readonly object Gate = new();
 
     public static void Write(string message)
     {
+        if (!IsEnabled)
+        {
+            return;
+        }
+
         try
         {
             var root = Path.Combine(
@@ -25,5 +32,13 @@ internal static class UsageReaderDiagnostics
         catch
         {
         }
+    }
+
+    private static bool IsDiagnosticsEnabled()
+    {
+        var value = Environment.GetEnvironmentVariable(
+            "CODEX_SWITCHER_USAGE_DIAGNOSTICS");
+        return string.Equals(value, "1", StringComparison.Ordinal) ||
+               string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
     }
 }

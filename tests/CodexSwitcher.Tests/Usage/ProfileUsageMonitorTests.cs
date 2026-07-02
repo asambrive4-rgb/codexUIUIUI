@@ -75,6 +75,35 @@ public sealed class ProfileUsageMonitorTests
             Volatile.Read(ref snapshotCount));
     }
 
+    [TestMethod]
+    public void HasSamePublishedSurface_IgnoresLastSuccessfulAtOnly()
+    {
+        var profileId = ProfileId.New();
+        var fiveHour = new RateLimitWindow(
+            10,
+            300,
+            DateTimeOffset.UtcNow.AddHours(1));
+        var weekly = new RateLimitWindow(
+            40,
+            10_080,
+            DateTimeOffset.UtcNow.AddDays(2));
+        var previous = new ProfileRateLimitSnapshot(
+            profileId,
+            ProfileRateLimitStatus.Available,
+            fiveHour,
+            weekly,
+            DateTimeOffset.UtcNow.AddMinutes(-10));
+        var current = previous with
+        {
+            LastSuccessfulAt = DateTimeOffset.UtcNow
+        };
+
+        Assert.IsTrue(
+            ProfileUsageMonitor.HasSamePublishedSurface(
+                previous,
+                current));
+    }
+
     private static async Task WaitUntilAsync(
         Func<bool> condition,
         TimeSpan timeout)

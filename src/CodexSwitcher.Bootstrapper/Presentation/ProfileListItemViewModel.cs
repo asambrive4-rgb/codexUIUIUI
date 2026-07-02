@@ -5,6 +5,7 @@ namespace CodexSwitcher.Bootstrapper.Presentation;
 
 public sealed class ProfileListItemViewModel : ObservableObject
 {
+    private string _name;
     private string _status = "준비됨";
     private string _buttonText = "실행";
     private bool _isRunEnabled = true;
@@ -19,12 +20,19 @@ public sealed class ProfileListItemViewModel : ObservableObject
         string name)
     {
         Id = id;
-        Name = name;
+        _name = name;
     }
 
     public ProfileId Id { get; }
 
-    public string Name { get; }
+    public string Name
+    {
+        get => _name;
+        private set => SetField(ref _name, value);
+    }
+
+    public void UpdateName(string name) =>
+        Name = name;
 
     public string Status
     {

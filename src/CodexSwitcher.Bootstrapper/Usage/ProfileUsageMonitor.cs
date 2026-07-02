@@ -460,7 +460,7 @@ public sealed class ProfileUsageMonitor : IDisposable
         if (_publishedSnapshots.TryGetValue(
                 snapshot.ProfileId,
                 out var previous) &&
-            previous == snapshot)
+            HasSamePublishedSurface(previous, snapshot))
         {
             return false;
         }
@@ -469,6 +469,14 @@ public sealed class ProfileUsageMonitor : IDisposable
         SnapshotChanged?.Invoke(this, snapshot);
         return true;
     }
+
+    internal static bool HasSamePublishedSurface(
+        ProfileRateLimitSnapshot previous,
+        ProfileRateLimitSnapshot current) =>
+        previous.ProfileId == current.ProfileId &&
+        previous.Status == current.Status &&
+        previous.FiveHourLimit == current.FiveHourLimit &&
+        previous.WeeklyLimit == current.WeeklyLimit;
 
     private sealed class Lease : IDisposable
     {

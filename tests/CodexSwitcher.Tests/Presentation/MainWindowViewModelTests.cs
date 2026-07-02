@@ -100,6 +100,34 @@ public sealed class MainWindowViewModelTests
     }
 
     [TestMethod]
+    public async Task RefreshProfiles_WhenProfilesUnchanged_ReusesProfileListItems()
+    {
+        var fixture = new Fixture();
+        await fixture.ViewModel.InitializeAsync(CancellationToken.None);
+        var originalItem = fixture.ViewModel.Profiles.Single();
+        var inactiveProfiles = fixture.ViewModel.InactiveProfiles;
+        fixture.Store.Profiles[0] = new Profile(
+            fixture.Profile.Id,
+            ProfileName.Create("Renamed"));
+
+        await fixture.ViewModel.RefreshProfilesAsync(
+            CancellationToken.None);
+
+        Assert.AreSame(
+            originalItem,
+            fixture.ViewModel.Profiles.Single());
+        Assert.AreSame(
+            inactiveProfiles,
+            fixture.ViewModel.InactiveProfiles);
+        Assert.AreSame(
+            originalItem,
+            fixture.ViewModel.InactiveProfiles.Single());
+        Assert.AreEqual(
+            "Renamed",
+            originalItem.Name);
+    }
+
+    [TestMethod]
     public async Task RefreshRuntimeState_WithRecovery_DisablesActions()
     {
         var fixture = new Fixture();

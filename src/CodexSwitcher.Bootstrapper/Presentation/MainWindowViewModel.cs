@@ -48,16 +48,17 @@ public sealed class MainWindowViewModel : ObservableObject
     public ObservableCollection<ProfileListItemViewModel> Profiles =>
         _profileList.Profiles;
 
+    public ReadOnlyObservableCollection<ProfileListItemViewModel>
+        InactiveProfiles =>
+        _profileList.InactiveProfiles;
+
     public ProfileListItemViewModel? ActiveProfile =>
-        Profiles.FirstOrDefault(p => p.IsActive);
+        _profileList.ActiveProfile;
 
     public ProfileListItemViewModel? DefaultPopupProfile =>
-        ActiveProfile ?? Profiles.FirstOrDefault();
+        _profileList.DefaultPopupProfile;
 
     public bool HasActiveProfile => ActiveProfile is not null;
-
-    public IEnumerable<ProfileListItemViewModel> InactiveProfiles =>
-        Profiles.Where(p => !p.IsActive);
 
     public string InstallationStatusMessage
     {
@@ -361,7 +362,6 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ActiveProfile));
         OnPropertyChanged(nameof(HasActiveProfile));
-        OnPropertyChanged(nameof(InactiveProfiles));
     }
 
     private void SetOperationInProgress(bool value)

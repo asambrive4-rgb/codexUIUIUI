@@ -12,6 +12,10 @@ public sealed class PopupPlacementStore
     };
 
     private readonly string _filePath;
+    private readonly object _cacheGate = new();
+    private readonly SemaphoreSlim _saveGate = new(1, 1);
+    private PopupPlacement? _cachedPlacement;
+    private bool _cacheLoaded;
 
     public PopupPlacementStore()
         : this(CreateDefaultPath())
@@ -23,7 +27,58 @@ public sealed class PopupPlacementStore
         _filePath = filePath;
     }
 
-    public PopupPlacement? Read()
+    public async Task LoadAsync(CancellationToken cancellationToken)
+    {
+        var placement = await Task.Run(
+                ReadFromDisk,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        lock (_cacheGate)
+        {
+            _cachedPlacement = placement;
+            _cacheLoaded = true;
+        }
+    }
+
+    public PopupPlacement? ReadCached()
+    {
+        lock (_cacheGate)
+        {
+            return _cacheLoaded
+                ? _cachedPlacement
+                : null;
+        }
+    }
+
+    public async Task SaveAsync(
+        double left,
+        double top,
+        CancellationToken cancellationToken)
+    {
+        var placement = new PopupPlacement(left, top);
+        lock (_cacheGate)
+        {
+            _cachedPlacement = placement;
+            _cacheLoaded = true;
+        }
+
+        await _saveGate.WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+        try
+        {
+            await Task.Run(
+                    () => WriteToDisk(placement),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _saveGate.Release();
+        }
+    }
+
+    private PopupPlacement? ReadFromDisk()
     {
         try
         {
@@ -46,7 +101,7 @@ public sealed class PopupPlacementStore
         }
     }
 
-    public void Save(double left, double top)
+    private void WriteToDisk(PopupPlacement placement)
     {
         try
         {
@@ -59,7 +114,7 @@ public sealed class PopupPlacementStore
             using var stream = File.Create(_filePath);
             JsonSerializer.Serialize(
                 stream,
-                new PopupPlacement(left, top),
+                placement,
                 JsonOptions);
         }
         catch (Exception exception)

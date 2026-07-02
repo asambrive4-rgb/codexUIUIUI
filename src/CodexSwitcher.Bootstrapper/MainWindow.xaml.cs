@@ -12,6 +12,11 @@ namespace CodexSwitcher.Bootstrapper;
 
 public partial class MainWindow : FluentWindow
 {
+    private static readonly TimeSpan RuntimeMonitorInterval =
+        TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan RuntimeMonitorStopDelay =
+        TimeSpan.FromMilliseconds(400);
+
     private readonly MainWindowViewModel _viewModel;
     private readonly CreateProfileLoginUseCase _profileLogin;
     private readonly ProfileUsageMonitor _usageMonitor;
@@ -20,11 +25,17 @@ public partial class MainWindow : FluentWindow
     private readonly Dictionary<ProfileId, ProfileRateLimitSnapshot>
         _pendingUsageSnapshots = [];
     private CancellationTokenSource? _monitorCancellation;
+    private CancellationTokenSource? _runtimeMonitorStopDelayCancellation;
     private IDisposable? _usageSurfaceLease;
     private ProfilePopupWindow? _profilePopupWindow;
     private bool _usageMonitoringStarted;
+    private bool _runtimeMonitoringStarted;
     private bool _allowApplicationExit;
     private bool _usageSnapshotDrainScheduled;
+
+    private bool HasVisibleSurface =>
+        IsVisible ||
+        _profilePopupWindow?.IsVisible == true;
 
     public MainWindow(
         MainWindowViewModel viewModel,
@@ -43,13 +54,13 @@ public partial class MainWindow : FluentWindow
 
     public void StartRuntimeMonitoring()
     {
-        if (_monitorCancellation is not null)
+        if (_runtimeMonitoringStarted)
         {
             return;
         }
 
-        _monitorCancellation = new CancellationTokenSource();
-        _ = MonitorRuntimeAsync(_monitorCancellation.Token);
+        _runtimeMonitoringStarted = true;
+        UpdateRuntimeMonitorRegistration();
     }
 
     public void StartUsageMonitoring()
@@ -62,7 +73,7 @@ public partial class MainWindow : FluentWindow
         _usageMonitoringStarted = true;
         _usageMonitor.SnapshotChanged += OnUsageSnapshotChanged;
         _usageMonitor.RefreshingChanged += OnUsageRefreshingChanged;
-        UpdateUsageSurfaceRegistration();
+        UpdateVisibleSurfaceRegistrations();
     }
 
     public bool IsOperationInProgress =>
@@ -73,7 +84,7 @@ public partial class MainWindow : FluentWindow
         Show();
         RestoreAndActivate();
         CloseProfilePopup();
-        UpdateUsageSurfaceRegistration();
+        UpdateVisibleSurfaceRegistrations();
     }
 
     public void ShowDefaultSurface()
@@ -82,7 +93,7 @@ public partial class MainWindow : FluentWindow
         {
             Show();
             RestoreAndActivate();
-            UpdateUsageSurfaceRegistration();
+            UpdateVisibleSurfaceRegistrations();
             return;
         }
 
@@ -338,9 +349,9 @@ public partial class MainWindow : FluentWindow
             _usageSnapshotDrainScheduled = false;
         }
 
-        _monitorCancellation?.Cancel();
-        _monitorCancellation?.Dispose();
-        _monitorCancellation = null;
+        _runtimeMonitoringStarted = false;
+        CancelRuntimeMonitorStopDelay();
+        StopRuntimeMonitor();
         base.OnClosed(e);
     }
 
@@ -359,7 +370,13 @@ public partial class MainWindow : FluentWindow
         object sender,
         DependencyPropertyChangedEventArgs e)
     {
+        UpdateVisibleSurfaceRegistrations();
+    }
+
+    private void UpdateVisibleSurfaceRegistrations()
+    {
         UpdateUsageSurfaceRegistration();
+        UpdateRuntimeMonitorRegistration();
     }
 
     private void UpdateUsageSurfaceRegistration()
@@ -369,8 +386,7 @@ public partial class MainWindow : FluentWindow
             return;
         }
 
-        if (IsVisible ||
-            _profilePopupWindow?.IsVisible == true)
+        if (HasVisibleSurface)
         {
             _usageSurfaceLease ??=
                 _usageMonitor.AcquireVisibleSurface();
@@ -379,6 +395,122 @@ public partial class MainWindow : FluentWindow
 
         _usageSurfaceLease?.Dispose();
         _usageSurfaceLease = null;
+    }
+
+    private void UpdateRuntimeMonitorRegistration()
+    {
+        if (!_runtimeMonitoringStarted)
+        {
+            CancelRuntimeMonitorStopDelay();
+            StopRuntimeMonitor();
+            return;
+        }
+
+        if (!HasVisibleSurface)
+        {
+            ScheduleRuntimeMonitorStop();
+            return;
+        }
+
+        CancelRuntimeMonitorStopDelay();
+        StartRuntimeMonitor();
+    }
+
+    private void StartRuntimeMonitor()
+    {
+        if (_monitorCancellation is not null)
+        {
+            return;
+        }
+
+        _monitorCancellation = new CancellationTokenSource();
+        _ = MonitorRuntimeAsync(_monitorCancellation.Token);
+        _ = RefreshRuntimeStateOnceAsync(_monitorCancellation.Token);
+    }
+
+    private void ScheduleRuntimeMonitorStop()
+    {
+        if (_monitorCancellation is null ||
+            _runtimeMonitorStopDelayCancellation is not null)
+        {
+            return;
+        }
+
+        var cancellation = new CancellationTokenSource();
+        _runtimeMonitorStopDelayCancellation = cancellation;
+        _ = StopRuntimeMonitorAfterDelayAsync(cancellation);
+    }
+
+    private async Task StopRuntimeMonitorAfterDelayAsync(
+        CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(
+                RuntimeMonitorStopDelay,
+                cancellation.Token);
+        }
+        catch (OperationCanceledException)
+            when (cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        finally
+        {
+            if (ReferenceEquals(
+                    _runtimeMonitorStopDelayCancellation,
+                    cancellation))
+            {
+                _runtimeMonitorStopDelayCancellation = null;
+            }
+
+            cancellation.Dispose();
+        }
+
+        if (!HasVisibleSurface)
+        {
+            StopRuntimeMonitor();
+        }
+    }
+
+    private void CancelRuntimeMonitorStopDelay()
+    {
+        var cancellation = _runtimeMonitorStopDelayCancellation;
+        if (cancellation is null)
+        {
+            return;
+        }
+
+        _runtimeMonitorStopDelayCancellation = null;
+        cancellation.Cancel();
+    }
+
+    private void StopRuntimeMonitor()
+    {
+        var cancellation = _monitorCancellation;
+        if (cancellation is null)
+        {
+            return;
+        }
+
+        _monitorCancellation = null;
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    private async Task RefreshRuntimeStateOnceAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _viewModel.RefreshRuntimeStateAsync(
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            // The window is closing, so the queued refresh can be ignored.
+        }
     }
 
     private void OnUsageSnapshotChanged(
@@ -436,7 +568,7 @@ public partial class MainWindow : FluentWindow
     {
         CloseProfilePopup();
         Hide();
-        UpdateUsageSurfaceRegistration();
+        UpdateVisibleSurfaceRegistrations();
     }
 
     private void ProfilePopupWindow_Closed(
@@ -453,7 +585,7 @@ public partial class MainWindow : FluentWindow
         popup.MinimizeRequested -= ProfilePopupWindow_MinimizeRequested;
         popup.Closed -= ProfilePopupWindow_Closed;
         _profilePopupWindow = null;
-        UpdateUsageSurfaceRegistration();
+        UpdateVisibleSurfaceRegistrations();
     }
 
     private void CloseProfilePopup()
@@ -484,8 +616,7 @@ public partial class MainWindow : FluentWindow
         _profilePopupWindow = popup;
         popup.Show();
         Hide();
-        popup.RestoreAndActivate();
-        UpdateUsageSurfaceRegistration();
+        UpdateVisibleSurfaceRegistrations();
     }
 
     private void RestoreAndActivate()
@@ -495,21 +626,32 @@ public partial class MainWindow : FluentWindow
             WindowState = WindowState.Normal;
         }
 
-        _ = Activate();
+        if (IsActive)
+        {
+            _ = Focus();
+            return;
+        }
+
         Topmost = true;
         Topmost = false;
+        _ = Activate();
         _ = Focus();
     }
 
     private async Task MonitorRuntimeAsync(
         CancellationToken cancellationToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        using var timer = new PeriodicTimer(RuntimeMonitorInterval);
         try
         {
             while (await timer.WaitForNextTickAsync(
                        cancellationToken))
             {
+                if (!HasVisibleSurface)
+                {
+                    continue;
+                }
+
                 await _viewModel.RefreshRuntimeStateAsync(
                     cancellationToken);
             }
