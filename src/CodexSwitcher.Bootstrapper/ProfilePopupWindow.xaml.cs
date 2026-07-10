@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using CodexSwitcher.Bootstrapper.Presentation;
 
@@ -13,19 +12,51 @@ public partial class ProfilePopupWindow : Window
     private const double DefaultLowerOffset = 8;
 
     private readonly PopupPlacementStore _placementStore;
+    private bool _hasPlaced;
 
-    public ProfilePopupWindow(
-        ProfileListItemViewModel profile,
-        PopupPlacementStore placementStore)
+    public ProfilePopupWindow(PopupPlacementStore placementStore)
     {
         InitializeComponent();
         _placementStore = placementStore;
-        DataContext = profile;
     }
 
     public event EventHandler? ReturnRequested;
 
     public event EventHandler? MinimizeRequested;
+
+    /// <summary>
+    /// 같은 창 인스턴스를 재사용하며 프로필만 바인딩한다.
+    /// </summary>
+    public void ShowProfile(ProfileListItemViewModel profile)
+    {
+        DataContext = profile;
+
+        if (!IsVisible)
+        {
+            Show();
+        }
+
+        if (_hasPlaced)
+        {
+            RestoreAndActivate();
+            return;
+        }
+
+        if (IsLoaded)
+        {
+            PlacePopup();
+            _hasPlaced = true;
+            RestoreAndActivate();
+        }
+    }
+
+    public void HidePopup()
+    {
+        if (IsVisible)
+        {
+            Hide();
+        }
+    }
 
     public void RestoreAndActivate()
     {
@@ -46,7 +77,12 @@ public partial class ProfilePopupWindow : Window
     protected override void OnContentRendered(EventArgs e)
     {
         base.OnContentRendered(e);
-        PlacePopup();
+        if (!_hasPlaced)
+        {
+            PlacePopup();
+            _hasPlaced = true;
+        }
+
         RestoreAndActivate();
     }
 

@@ -234,6 +234,41 @@ public sealed class ProfilePresentationTests
     }
 
     [TestMethod]
+    public void RateLimitWindow_ApplySameWindow_DoesNotRaisePropertyChanged()
+    {
+        var viewModel = new RateLimitWindowViewModel("5시간 한도");
+        var window = new RateLimitWindow(
+            20,
+            300,
+            DateTimeOffset.Now.AddHours(1));
+        viewModel.Apply(window);
+
+        var changeCount = 0;
+        viewModel.PropertyChanged += (_, _) => changeCount++;
+        viewModel.Apply(window);
+        viewModel.Apply(window);
+
+        Assert.AreEqual(0, changeCount);
+    }
+
+    [TestMethod]
+    public void RateLimitWindow_ApplyNullTwice_DoesNotRaiseSecondTime()
+    {
+        var viewModel = new RateLimitWindowViewModel("5시간 한도");
+        viewModel.Apply(
+            new RateLimitWindow(20, 300, null));
+
+        var changeCount = 0;
+        viewModel.PropertyChanged += (_, _) => changeCount++;
+        viewModel.Apply(null);
+        var afterClear = changeCount;
+        viewModel.Apply(null);
+
+        Assert.IsGreaterThan(0, afterClear);
+        Assert.AreEqual(afterClear, changeCount);
+    }
+
+    [TestMethod]
     public void OperationFormatter_PreservesRepresentativeMessages()
     {
         Assert.AreEqual(

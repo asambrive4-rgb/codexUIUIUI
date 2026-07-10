@@ -69,4 +69,49 @@ public sealed class ProfileUsageRefreshPolicyTests
                 isActive: true,
                 consecutiveFailures: 3));
     }
+
+    [TestMethod]
+    public void IsCacheFresh_AvailableInactive_UsesFiveMinutes()
+    {
+        Assert.IsTrue(
+            ProfileUsageRefreshPolicy.IsCacheFresh(
+                Now,
+                Now - TimeSpan.FromMinutes(4),
+                ProfileRateLimitStatus.Available,
+                isActive: false));
+        Assert.IsFalse(
+            ProfileUsageRefreshPolicy.IsCacheFresh(
+                Now,
+                Now - TimeSpan.FromMinutes(5),
+                ProfileRateLimitStatus.Available,
+                isActive: false));
+    }
+
+    [TestMethod]
+    public void IsCacheFresh_AvailableActive_UsesTenSeconds()
+    {
+        Assert.IsTrue(
+            ProfileUsageRefreshPolicy.IsCacheFresh(
+                Now,
+                Now - TimeSpan.FromSeconds(9),
+                ProfileRateLimitStatus.Available,
+                isActive: true));
+        Assert.IsFalse(
+            ProfileUsageRefreshPolicy.IsCacheFresh(
+                Now,
+                Now - TimeSpan.FromSeconds(10),
+                ProfileRateLimitStatus.Available,
+                isActive: true));
+    }
+
+    [TestMethod]
+    public void IsCacheFresh_Loading_IsNeverFresh()
+    {
+        Assert.IsFalse(
+            ProfileUsageRefreshPolicy.IsCacheFresh(
+                Now,
+                Now,
+                ProfileRateLimitStatus.Loading,
+                isActive: true));
+    }
 }

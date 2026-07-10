@@ -6,6 +6,9 @@ namespace CodexSwitcher.Infrastructure.Profiles;
 
 public sealed class WindowsCodexLoginController : ICodexLoginController
 {
+    private static readonly string[] AppProcessNames =
+        ["ChatGPT", "Codex"];
+
     private static readonly TimeSpan NormalStopTimeout =
         TimeSpan.FromSeconds(10);
 
@@ -210,9 +213,64 @@ public sealed class WindowsCodexLoginController : ICodexLoginController
 
     private static List<Process> GetCodexProcesses()
     {
-        return Process
-            .GetProcessesByName("Codex")
-            .ToList();
+        var matches = new List<Process>();
+
+        foreach (var processName in AppProcessNames)
+        {
+            foreach (var process in Process.GetProcessesByName(processName))
+            {
+                if (IsCodexAppProcess(process))
+                {
+                    matches.Add(process);
+                }
+                else
+                {
+                    process.Dispose();
+                }
+            }
+        }
+
+        return matches;
+    }
+
+    private static bool IsCodexAppProcess(Process process)
+    {
+        try
+        {
+            return IsCodexAppExecutablePath(
+                process.MainModule?.FileName);
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException or
+                  NotSupportedException or
+                  System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    internal static bool IsCodexAppExecutablePath(
+        string? executablePath)
+    {
+        if (string.IsNullOrWhiteSpace(executablePath))
+        {
+            return false;
+        }
+
+        var normalizedPath = executablePath.Replace('/', '\\');
+        if (!normalizedPath.Contains(
+                @"\WindowsApps\OpenAI.Codex_",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return normalizedPath.EndsWith(
+                   @"\app\ChatGPT.exe",
+                   StringComparison.OrdinalIgnoreCase) ||
+               normalizedPath.EndsWith(
+                   @"\app\Codex.exe",
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     private static void DisposeAll(IEnumerable<Process> processes)

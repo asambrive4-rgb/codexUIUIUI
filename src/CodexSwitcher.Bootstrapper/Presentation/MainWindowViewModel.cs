@@ -126,10 +126,37 @@ public sealed class MainWindowViewModel : ObservableObject
     public async Task InitializeAsync(
         CancellationToken cancellationToken)
     {
-        var result = await RunOffUiThreadAsync(
-            token => _detectInstallation.ExecuteAsync(token),
+        await InitializeShellAsync(cancellationToken);
+        await RefreshRuntimeStateAsync(
+            cancellationToken,
+            forceApply: true,
+            forceRuntimeRefresh: true);
+    }
+
+    /// <summary>
+    /// 설치 여부·프로필 목록·복구 플래그만 준비한다.
+    /// 런타임/사용량 전체 조회 전에 표면을 띄울 수 있게 한다.
+    /// </summary>
+    public async Task InitializeShellAsync(
+        CancellationToken cancellationToken)
+    {
+        var shell = await RunOffUiThreadAsync(
+            async token =>
+            {
+                var installation =
+                    await _detectInstallation.ExecuteAsync(token);
+                var profiles =
+                    await _listProfiles.ExecuteAsync(token);
+                var hasRecovery =
+                    await _profileLogin.HasPendingRecoveryAsync(token);
+                return new ShellLoadResult(
+                    installation,
+                    profiles,
+                    hasRecovery);
+            },
             cancellationToken);
-        InstallationStatusMessage = result.Status switch
+
+        InstallationStatusMessage = shell.Installation.Status switch
         {
             CodexInstallationDetectionStatus.Installed =>
                 "설치됨",
@@ -138,7 +165,18 @@ public sealed class MainWindowViewModel : ObservableObject
             _ => "오류"
         };
 
-        await RefreshProfilesAsync(cancellationToken);
+        _profileList.Replace(shell.Profiles.Profiles);
+        InvalidateRuntimePresentation();
+        ProfileStatusMessage = shell.Profiles.Issues.Count > 0
+            ? "일부 프로필 저장 데이터를 읽지 못했습니다. 새 프로필 추가 전에 저장소 확인이 필요합니다."
+            : shell.Profiles.Profiles.Count == 0
+                ? "저장된 프로필이 없습니다."
+                : $"프로필 {shell.Profiles.Profiles.Count}개";
+        HasPendingRecovery = shell.HasPendingRecovery;
+        if (shell.HasPendingRecovery)
+        {
+            _profileList.DisableAllActions();
+        }
     }
 
     public async Task RefreshProfilesAsync(
@@ -168,10 +206,39 @@ public sealed class MainWindowViewModel : ObservableObject
             forceApply: false,
             forceRuntimeRefresh: false);
 
+    /// <summary>
+    /// 모니터가 이미 조회한 런타임 상태를 UI에 반영한다.
+    /// GetProfileRuntimeState를 다시 호출하지 않는다 (이중 폴링 방지).
+    /// </summary>
+    public Task ApplyMonitoredRuntimeStateAsync(
+        ProfileRuntimeState state,
+        CancellationToken cancellationToken) =>
+        ApplyRuntimeRefreshAsync(
+            async token => new RuntimeRefreshResult(
+                await _profileLogin.HasPendingRecoveryAsync(token),
+                state),
+            forceApply: false,
+            cancellationToken);
+
     private async Task RefreshRuntimeStateAsync(
         CancellationToken cancellationToken,
         bool forceApply,
         bool forceRuntimeRefresh)
+    {
+        await ApplyRuntimeRefreshAsync(
+            async token => new RuntimeRefreshResult(
+                await _profileLogin.HasPendingRecoveryAsync(token),
+                await _getRuntimeState.ExecuteAsync(
+                    forceRuntimeRefresh,
+                    token)),
+            forceApply,
+            cancellationToken);
+    }
+
+    private async Task ApplyRuntimeRefreshAsync(
+        Func<CancellationToken, Task<RuntimeRefreshResult>> load,
+        bool forceApply,
+        CancellationToken cancellationToken)
     {
         if (_isOperationInProgress ||
             !await _runtimeRefreshGate.WaitAsync(
@@ -184,11 +251,7 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             var result = await RunOffUiThreadAsync(
-                async token => new RuntimeRefreshResult(
-                    await _profileLogin.HasPendingRecoveryAsync(token),
-                    await _getRuntimeState.ExecuteAsync(
-                        forceRuntimeRefresh,
-                        token)),
+                load,
                 cancellationToken);
 
             HasPendingRecovery = result.HasPendingRecovery;
@@ -379,4 +442,9 @@ public sealed class MainWindowViewModel : ObservableObject
     private sealed record RuntimeRefreshResult(
         bool HasPendingRecovery,
         ProfileRuntimeState State);
+
+    private sealed record ShellLoadResult(
+        DetectCodexInstallationResult Installation,
+        ProfileStoreReadResult Profiles,
+        bool HasPendingRecovery);
 }

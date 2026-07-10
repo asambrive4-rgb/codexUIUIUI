@@ -21,6 +21,8 @@ public sealed class RateLimitWindowViewModel : ObservableObject
     private string _resetTimeText = "정보 없음";
     private string _popupResetText = "--";
     private bool _isDataAvailable;
+    private RateLimitWindow? _lastAppliedWindow;
+    private bool _lastAppliedWasNull = true;
 
     public RateLimitWindowViewModel(string label)
     {
@@ -77,6 +79,13 @@ public sealed class RateLimitWindowViewModel : ObservableObject
     {
         if (window is null)
         {
+            if (_lastAppliedWasNull)
+            {
+                return;
+            }
+
+            _lastAppliedWasNull = true;
+            _lastAppliedWindow = null;
             RemainingPercent = 0;
             ProgressBrush = DeadBrush;
             DisplayText = $"{Label} · 정보 없음";
@@ -87,6 +96,14 @@ public sealed class RateLimitWindowViewModel : ObservableObject
             return;
         }
 
+        if (!_lastAppliedWasNull &&
+            _lastAppliedWindow == window)
+        {
+            return;
+        }
+
+        _lastAppliedWasNull = false;
+        _lastAppliedWindow = window;
         RemainingPercent = window.RemainingPercent;
         IsDataAvailable = true;
         ProgressBrush = window.DisplayLevel switch

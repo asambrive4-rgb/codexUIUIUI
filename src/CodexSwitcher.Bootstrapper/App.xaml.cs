@@ -79,11 +79,14 @@ public partial class App : Application
                 profileStore,
                 rateLimitReader,
                 operationCoordinator);
+        var usageSnapshotCache =
+            new FileProfileUsageSnapshotCache();
         var usageMonitor = new ProfileUsageMonitor(
             listProfiles,
             getRuntimeState,
             refreshProfileRateLimit,
-            rateLimitReader);
+            rateLimitReader,
+            usageSnapshotCache);
         var viewModel = new MainWindowViewModel(
             detectInstallation,
             listProfiles,
@@ -95,6 +98,8 @@ public partial class App : Application
         var popupPlacementStore = new PopupPlacementStore();
         var popupPlacementLoad =
             popupPlacementStore.LoadAsync(CancellationToken.None);
+        var usageCacheLoad =
+            usageSnapshotCache.LoadAsync(CancellationToken.None);
         var window = new MainWindow(
             viewModel,
             profileLogin,
@@ -114,12 +119,25 @@ public partial class App : Application
                 RequestApplicationExit));
         _trayIcon.UpdateStatus(viewModel.RuntimeStatusMessage);
 
-        await Task.WhenAll(
-            viewModel.InitializeAsync(CancellationToken.None),
-            popupPlacementLoad);
-        window.StartRuntimeMonitoring();
+        // 배치·사용량 캐시는 로컬 I/O라 표면 전에 맞춘다.
+        await Task.WhenAll(popupPlacementLoad, usageCacheLoad);
+
+        // 목록·복구 플래그만 준비한 뒤 바로 표면을 띄운다 (점진 표시).
+        // 런타임·사용량 상세는 모니터/후속 갱신이 채운다.
         window.StartUsageMonitoring();
+        await viewModel.InitializeShellAsync(CancellationToken.None);
         window.ShowDefaultSurface();
+
+        // 표면이 뜬 뒤 런타임 상태를 한 번 더 맞춘다 (복구·활성 뱃지).
+        try
+        {
+            await viewModel.RefreshRuntimeStateAsync(
+                CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            // 기동 직후 종료되면 무시한다.
+        }
     }
 
     protected override void OnSessionEnding(

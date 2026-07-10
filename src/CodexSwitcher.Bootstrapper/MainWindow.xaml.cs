@@ -12,11 +12,6 @@ namespace CodexSwitcher.Bootstrapper;
 
 public partial class MainWindow : FluentWindow
 {
-    private static readonly TimeSpan RuntimeMonitorInterval =
-        TimeSpan.FromSeconds(3);
-    private static readonly TimeSpan RuntimeMonitorStopDelay =
-        TimeSpan.FromMilliseconds(400);
-
     private readonly MainWindowViewModel _viewModel;
     private readonly CreateProfileLoginUseCase _profileLogin;
     private readonly ProfileUsageMonitor _usageMonitor;
@@ -24,14 +19,14 @@ public partial class MainWindow : FluentWindow
     private readonly object _usageSnapshotGate = new();
     private readonly Dictionary<ProfileId, ProfileRateLimitSnapshot>
         _pendingUsageSnapshots = [];
-    private CancellationTokenSource? _monitorCancellation;
-    private CancellationTokenSource? _runtimeMonitorStopDelayCancellation;
+    private readonly object _runtimeStateGate = new();
+    private ProfileRuntimeState? _pendingRuntimeState;
     private IDisposable? _usageSurfaceLease;
     private ProfilePopupWindow? _profilePopupWindow;
     private bool _usageMonitoringStarted;
-    private bool _runtimeMonitoringStarted;
     private bool _allowApplicationExit;
     private bool _usageSnapshotDrainScheduled;
+    private bool _runtimeStateDrainScheduled;
 
     private bool HasVisibleSurface =>
         IsVisible ||
@@ -52,16 +47,12 @@ public partial class MainWindow : FluentWindow
         IsVisibleChanged += MainWindow_IsVisibleChanged;
     }
 
-    public void StartRuntimeMonitoring()
-    {
-        if (_runtimeMonitoringStarted)
-        {
-            return;
-        }
-
-        _runtimeMonitoringStarted = true;
-        UpdateRuntimeMonitorRegistration();
-    }
+    /// <summary>
+    /// 런타임 폴링은 사용량 모니터 단일 루프에 통합됐다.
+    /// 호환을 위해 남겨 두며, 사용량 모니터링 시작과 동일하게 동작한다.
+    /// </summary>
+    public void StartRuntimeMonitoring() =>
+        StartUsageMonitoring();
 
     public void StartUsageMonitoring()
     {
@@ -72,6 +63,7 @@ public partial class MainWindow : FluentWindow
 
         _usageMonitoringStarted = true;
         _usageMonitor.SnapshotChanged += OnUsageSnapshotChanged;
+        _usageMonitor.RuntimeStateChanged += OnRuntimeStateChanged;
         _usageMonitor.RefreshingChanged += OnUsageRefreshingChanged;
         UpdateVisibleSurfaceRegistrations();
     }
@@ -339,8 +331,9 @@ public partial class MainWindow : FluentWindow
     {
         IsVisibleChanged -= MainWindow_IsVisibleChanged;
         _usageMonitor.SnapshotChanged -= OnUsageSnapshotChanged;
+        _usageMonitor.RuntimeStateChanged -= OnRuntimeStateChanged;
         _usageMonitor.RefreshingChanged -= OnUsageRefreshingChanged;
-        CloseProfilePopup();
+        DisposeProfilePopup();
         _usageSurfaceLease?.Dispose();
         _usageSurfaceLease = null;
         lock (_usageSnapshotGate)
@@ -349,9 +342,12 @@ public partial class MainWindow : FluentWindow
             _usageSnapshotDrainScheduled = false;
         }
 
-        _runtimeMonitoringStarted = false;
-        CancelRuntimeMonitorStopDelay();
-        StopRuntimeMonitor();
+        lock (_runtimeStateGate)
+        {
+            _pendingRuntimeState = null;
+            _runtimeStateDrainScheduled = false;
+        }
+
         base.OnClosed(e);
     }
 
@@ -375,12 +371,6 @@ public partial class MainWindow : FluentWindow
 
     private void UpdateVisibleSurfaceRegistrations()
     {
-        UpdateUsageSurfaceRegistration();
-        UpdateRuntimeMonitorRegistration();
-    }
-
-    private void UpdateUsageSurfaceRegistration()
-    {
         if (!_usageMonitoringStarted)
         {
             return;
@@ -395,122 +385,6 @@ public partial class MainWindow : FluentWindow
 
         _usageSurfaceLease?.Dispose();
         _usageSurfaceLease = null;
-    }
-
-    private void UpdateRuntimeMonitorRegistration()
-    {
-        if (!_runtimeMonitoringStarted)
-        {
-            CancelRuntimeMonitorStopDelay();
-            StopRuntimeMonitor();
-            return;
-        }
-
-        if (!HasVisibleSurface)
-        {
-            ScheduleRuntimeMonitorStop();
-            return;
-        }
-
-        CancelRuntimeMonitorStopDelay();
-        StartRuntimeMonitor();
-    }
-
-    private void StartRuntimeMonitor()
-    {
-        if (_monitorCancellation is not null)
-        {
-            return;
-        }
-
-        _monitorCancellation = new CancellationTokenSource();
-        _ = MonitorRuntimeAsync(_monitorCancellation.Token);
-        _ = RefreshRuntimeStateOnceAsync(_monitorCancellation.Token);
-    }
-
-    private void ScheduleRuntimeMonitorStop()
-    {
-        if (_monitorCancellation is null ||
-            _runtimeMonitorStopDelayCancellation is not null)
-        {
-            return;
-        }
-
-        var cancellation = new CancellationTokenSource();
-        _runtimeMonitorStopDelayCancellation = cancellation;
-        _ = StopRuntimeMonitorAfterDelayAsync(cancellation);
-    }
-
-    private async Task StopRuntimeMonitorAfterDelayAsync(
-        CancellationTokenSource cancellation)
-    {
-        try
-        {
-            await Task.Delay(
-                RuntimeMonitorStopDelay,
-                cancellation.Token);
-        }
-        catch (OperationCanceledException)
-            when (cancellation.IsCancellationRequested)
-        {
-            return;
-        }
-        finally
-        {
-            if (ReferenceEquals(
-                    _runtimeMonitorStopDelayCancellation,
-                    cancellation))
-            {
-                _runtimeMonitorStopDelayCancellation = null;
-            }
-
-            cancellation.Dispose();
-        }
-
-        if (!HasVisibleSurface)
-        {
-            StopRuntimeMonitor();
-        }
-    }
-
-    private void CancelRuntimeMonitorStopDelay()
-    {
-        var cancellation = _runtimeMonitorStopDelayCancellation;
-        if (cancellation is null)
-        {
-            return;
-        }
-
-        _runtimeMonitorStopDelayCancellation = null;
-        cancellation.Cancel();
-    }
-
-    private void StopRuntimeMonitor()
-    {
-        var cancellation = _monitorCancellation;
-        if (cancellation is null)
-        {
-            return;
-        }
-
-        _monitorCancellation = null;
-        cancellation.Cancel();
-        cancellation.Dispose();
-    }
-
-    private async Task RefreshRuntimeStateOnceAsync(
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            await _viewModel.RefreshRuntimeStateAsync(
-                cancellationToken);
-        }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
-        {
-            // The window is closing, so the queued refresh can be ignored.
-        }
     }
 
     private void OnUsageSnapshotChanged(
@@ -549,6 +423,53 @@ public partial class MainWindow : FluentWindow
         }
     }
 
+    private void OnRuntimeStateChanged(
+        object? sender,
+        ProfileRuntimeState state)
+    {
+        lock (_runtimeStateGate)
+        {
+            _pendingRuntimeState = state;
+            if (_runtimeStateDrainScheduled)
+            {
+                return;
+            }
+
+            _runtimeStateDrainScheduled = true;
+        }
+
+        _ = Dispatcher.InvokeAsync(
+            DrainRuntimeState,
+            DispatcherPriority.Background);
+    }
+
+    private async void DrainRuntimeState()
+    {
+        ProfileRuntimeState? state;
+        lock (_runtimeStateGate)
+        {
+            state = _pendingRuntimeState;
+            _pendingRuntimeState = null;
+            _runtimeStateDrainScheduled = false;
+        }
+
+        if (state is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _viewModel.ApplyMonitoredRuntimeStateAsync(
+                state,
+                CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            // 창이 닫히는 중이면 무시한다.
+        }
+    }
+
     private void OnUsageRefreshingChanged(
         object? sender,
         bool isRefreshing)
@@ -566,7 +487,7 @@ public partial class MainWindow : FluentWindow
         object? sender,
         EventArgs e)
     {
-        CloseProfilePopup();
+        HideProfilePopup();
         Hide();
         UpdateVisibleSurfaceRegistrations();
     }
@@ -588,7 +509,18 @@ public partial class MainWindow : FluentWindow
         UpdateVisibleSurfaceRegistrations();
     }
 
-    private void CloseProfilePopup()
+    /// <summary>
+    /// 팝업을 숨긴다. 인스턴스는 재사용을 위해 유지한다.
+    /// </summary>
+    private void CloseProfilePopup() =>
+        HideProfilePopup();
+
+    private void HideProfilePopup()
+    {
+        _profilePopupWindow?.HidePopup();
+    }
+
+    private void DisposeProfilePopup()
     {
         if (_profilePopupWindow is null)
         {
@@ -605,18 +537,24 @@ public partial class MainWindow : FluentWindow
 
     private void OpenProfilePopup(ProfileListItemViewModel profile)
     {
-        CloseProfilePopup();
+        EnsureProfilePopup();
+        _profilePopupWindow!.ShowProfile(profile);
+        Hide();
+        UpdateVisibleSurfaceRegistrations();
+    }
 
-        var popup = new ProfilePopupWindow(
-            profile,
-            _popupPlacementStore);
+    private void EnsureProfilePopup()
+    {
+        if (_profilePopupWindow is not null)
+        {
+            return;
+        }
+
+        var popup = new ProfilePopupWindow(_popupPlacementStore);
         popup.ReturnRequested += ProfilePopupWindow_ReturnRequested;
         popup.MinimizeRequested += ProfilePopupWindow_MinimizeRequested;
         popup.Closed += ProfilePopupWindow_Closed;
         _profilePopupWindow = popup;
-        popup.Show();
-        Hide();
-        UpdateVisibleSurfaceRegistrations();
     }
 
     private void RestoreAndActivate()
@@ -636,30 +574,5 @@ public partial class MainWindow : FluentWindow
         Topmost = false;
         _ = Activate();
         _ = Focus();
-    }
-
-    private async Task MonitorRuntimeAsync(
-        CancellationToken cancellationToken)
-    {
-        using var timer = new PeriodicTimer(RuntimeMonitorInterval);
-        try
-        {
-            while (await timer.WaitForNextTickAsync(
-                       cancellationToken))
-            {
-                if (!HasVisibleSurface)
-                {
-                    continue;
-                }
-
-                await _viewModel.RefreshRuntimeStateAsync(
-                    cancellationToken);
-            }
-        }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
-        {
-            // 창이 닫히면 상태 확인을 끝낸다.
-        }
     }
 }

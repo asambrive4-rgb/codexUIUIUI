@@ -1,6 +1,7 @@
 using CodexSwitcher.Bootstrapper.Usage;
 using CodexSwitcher.Core.Profiles;
 using CodexSwitcher.Core.Usage;
+using CodexSwitcher.Infrastructure.Usage;
 
 namespace CodexSwitcher.Tests.Usage;
 
@@ -8,7 +9,7 @@ namespace CodexSwitcher.Tests.Usage;
 public sealed class ProfileUsageMonitorTests
 {
     [TestMethod]
-    public async Task Monitor_WhenRuntimeUnknown_ProbesStoredProfiles()
+    public async Task Monitor_WhenRuntimeUnknown_ProbesStoredProfilesWithinBudget()
     {
         var store = new StubProfileStore(
             new Profile(
@@ -18,27 +19,39 @@ public sealed class ProfileUsageMonitorTests
                 ProfileId.New(),
                 ProfileName.Create("B")));
         var reader = new RecordingRateLimitReader();
-        using var monitor = new ProfileUsageMonitor(
-            new ListProfilesUseCase(store),
-            new GetProfileRuntimeStateUseCase(
-                store,
-                new UnknownAuthenticationSession(),
-                new RunningCodexController()),
-            new RefreshProfileRateLimitUseCase(
-                store,
-                reader,
-                new ProfileOperationCoordinator()),
-            reader);
+        using var monitor = CreateMonitor(store, reader);
+
+        using var surface = monitor.AcquireVisibleSurface();
+        // OpenSurface 예산 1 + 이후 Scheduled 틱(3초)으로 나머지 probe
+        await WaitUntilAsync(
+            () => reader.CallCount >= 2,
+            TimeSpan.FromSeconds(8));
+
+        Assert.IsGreaterThanOrEqualTo(2, reader.CallCount);
+        Assert.IsTrue(
+            reader.KeepAliveValues.All(keepAlive => !keepAlive));
+    }
+
+    [TestMethod]
+    public async Task Monitor_OpenSurface_ProbesAtMostOneProfileWhenCacheEmpty()
+    {
+        var store = new StubProfileStore(
+            new Profile(
+                ProfileId.New(),
+                ProfileName.Create("A")),
+            new Profile(
+                ProfileId.New(),
+                ProfileName.Create("B")));
+        var reader = new RecordingRateLimitReader();
+        using var monitor = CreateMonitor(store, reader);
 
         using var surface = monitor.AcquireVisibleSurface();
         await WaitUntilAsync(
-            () => reader.CallCount >= 2,
+            () => reader.CallCount >= 1,
             TimeSpan.FromSeconds(2));
+        await Task.Delay(100);
 
-        Assert.HasCount(2, reader.KeepAliveValues);
-        CollectionAssert.AreEqual(
-            new[] { false, false },
-            reader.KeepAliveValues);
+        Assert.AreEqual(1, reader.CallCount);
     }
 
     [TestMethod]
@@ -49,17 +62,7 @@ public sealed class ProfileUsageMonitorTests
                 ProfileId.New(),
                 ProfileName.Create("A")));
         var reader = new RecordingRateLimitReader();
-        using var monitor = new ProfileUsageMonitor(
-            new ListProfilesUseCase(store),
-            new GetProfileRuntimeStateUseCase(
-                store,
-                new UnknownAuthenticationSession(),
-                new RunningCodexController()),
-            new RefreshProfileRateLimitUseCase(
-                store,
-                reader,
-                new ProfileOperationCoordinator()),
-            reader);
+        using var monitor = CreateMonitor(store, reader);
         var snapshotCount = 0;
         monitor.SnapshotChanged += (_, _) =>
             Interlocked.Increment(ref snapshotCount);
@@ -73,6 +76,100 @@ public sealed class ProfileUsageMonitorTests
         Assert.AreEqual(
             2,
             Volatile.Read(ref snapshotCount));
+    }
+
+    [TestMethod]
+    public async Task Monitor_PublishesRuntimeState_OnVisibleSurface()
+    {
+        var store = new StubProfileStore(
+            new Profile(
+                ProfileId.New(),
+                ProfileName.Create("A")));
+        var reader = new RecordingRateLimitReader();
+        using var monitor = CreateMonitor(store, reader);
+        ProfileRuntimeState? published = null;
+        monitor.RuntimeStateChanged += (_, state) =>
+            published = state;
+
+        using var surface = monitor.AcquireVisibleSurface();
+        await WaitUntilAsync(
+            () => published is not null,
+            TimeSpan.FromSeconds(2));
+
+        Assert.IsNotNull(published);
+        Assert.AreEqual(
+            ProfileRuntimeStatus.RunningUnknownProfile,
+            published.Status);
+    }
+
+    [TestMethod]
+    public async Task Monitor_WhenCacheFresh_SkipsReader()
+    {
+        var profile = new Profile(
+            ProfileId.New(),
+            ProfileName.Create("Cached"));
+        var store = new StubProfileStore(profile);
+        var cache = new MemoryProfileUsageSnapshotCache();
+        await cache.SetAsync(
+            new CachedProfileUsageEntry(
+                profile.Id,
+                ProfileRateLimitStatus.Available,
+                new RateLimitWindow(10, 300, null),
+                new RateLimitWindow(20, 10_080, null),
+                DateTimeOffset.Now,
+                DateTimeOffset.Now),
+            CancellationToken.None);
+        var reader = new RecordingRateLimitReader();
+        using var monitor = CreateMonitor(store, reader, cache);
+        ProfileRateLimitSnapshot? published = null;
+        monitor.SnapshotChanged += (_, snapshot) =>
+            published = snapshot;
+
+        using var surface = monitor.AcquireVisibleSurface();
+        await WaitUntilAsync(
+            () => published is not null &&
+                  published.Status ==
+                  ProfileRateLimitStatus.Available,
+            TimeSpan.FromSeconds(2));
+        await Task.Delay(100);
+
+        Assert.AreEqual(0, reader.CallCount);
+        Assert.AreEqual(
+            ProfileRateLimitStatus.Available,
+            published!.Status);
+    }
+
+    [TestMethod]
+    public async Task Monitor_ManualForce_IgnoresFreshCache()
+    {
+        var profile = new Profile(
+            ProfileId.New(),
+            ProfileName.Create("Cached"));
+        var store = new StubProfileStore(profile);
+        var cache = new MemoryProfileUsageSnapshotCache();
+        await cache.SetAsync(
+            new CachedProfileUsageEntry(
+                profile.Id,
+                ProfileRateLimitStatus.Available,
+                new RateLimitWindow(10, 300, null),
+                null,
+                DateTimeOffset.Now,
+                DateTimeOffset.Now),
+            CancellationToken.None);
+        var reader = new RecordingRateLimitReader();
+        using var monitor = CreateMonitor(store, reader, cache);
+
+        using var surface = monitor.AcquireVisibleSurface();
+        await WaitUntilAsync(
+            () => true,
+            TimeSpan.FromMilliseconds(200));
+        // 캐시 hit로 OpenSurface는 reader를 안 부를 수 있다.
+        await monitor.RefreshAllNowAsync(CancellationToken.None);
+        await WaitUntilAsync(
+            () => reader.CallCount >= 1,
+            TimeSpan.FromSeconds(2));
+
+        Assert.IsGreaterThanOrEqualTo(1, reader.CallCount);
     }
 
     [TestMethod]
@@ -103,6 +200,23 @@ public sealed class ProfileUsageMonitorTests
                 previous,
                 current));
     }
+
+    private static ProfileUsageMonitor CreateMonitor(
+        IProfileStore store,
+        IProfileRateLimitReader reader,
+        IProfileUsageSnapshotCache? cache = null) =>
+        new(
+            new ListProfilesUseCase(store),
+            new GetProfileRuntimeStateUseCase(
+                store,
+                new UnknownAuthenticationSession(),
+                new RunningCodexController()),
+            new RefreshProfileRateLimitUseCase(
+                store,
+                reader,
+                new ProfileOperationCoordinator()),
+            reader,
+            cache ?? new MemoryProfileUsageSnapshotCache());
 
     private static async Task WaitUntilAsync(
         Func<bool> condition,
