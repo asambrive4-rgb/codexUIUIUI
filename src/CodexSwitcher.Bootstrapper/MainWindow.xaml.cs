@@ -463,6 +463,7 @@ public partial class MainWindow : FluentWindow
             await _viewModel.ApplyMonitoredRuntimeStateAsync(
                 state,
                 CancellationToken.None);
+            SyncProfilePopupSurface();
         }
         catch (OperationCanceledException)
         {
@@ -492,6 +493,45 @@ public partial class MainWindow : FluentWindow
         UpdateVisibleSurfaceRegistrations();
     }
 
+    private async void ProfilePopupWindow_SwitchRequested(
+        object? sender,
+        EventArgs e)
+    {
+        var candidates = _viewModel.GetOverlaySwitchCandidates();
+        if (candidates.Count == 0)
+        {
+            SyncProfilePopupSurface();
+            return;
+        }
+
+        if (candidates.Count == 1)
+        {
+            await SwitchFromOverlayAsync(candidates[0]);
+            return;
+        }
+
+        if (_profilePopupWindow is null)
+        {
+            return;
+        }
+
+        _profilePopupWindow.OpenSwitchCandidateMenu(
+            candidates,
+            profile =>
+                _ = SwitchFromOverlayAsync(profile));
+    }
+
+    private async Task SwitchFromOverlayAsync(
+        ProfileListItemViewModel profile)
+    {
+        using var pause = await _usageMonitor.PauseAsync(
+            CancellationToken.None);
+        await _viewModel.SwitchProfileAsync(
+            profile.Id,
+            CancellationToken.None);
+        SyncProfilePopupSurface();
+    }
+
     private void ProfilePopupWindow_Closed(
         object? sender,
         EventArgs e)
@@ -504,6 +544,7 @@ public partial class MainWindow : FluentWindow
 
         popup.ReturnRequested -= ProfilePopupWindow_ReturnRequested;
         popup.MinimizeRequested -= ProfilePopupWindow_MinimizeRequested;
+        popup.SwitchRequested -= ProfilePopupWindow_SwitchRequested;
         popup.Closed -= ProfilePopupWindow_Closed;
         _profilePopupWindow = null;
         UpdateVisibleSurfaceRegistrations();
@@ -530,6 +571,7 @@ public partial class MainWindow : FluentWindow
         var popup = _profilePopupWindow;
         popup.ReturnRequested -= ProfilePopupWindow_ReturnRequested;
         popup.MinimizeRequested -= ProfilePopupWindow_MinimizeRequested;
+        popup.SwitchRequested -= ProfilePopupWindow_SwitchRequested;
         popup.Closed -= ProfilePopupWindow_Closed;
         _profilePopupWindow = null;
         popup.Close();
@@ -539,8 +581,31 @@ public partial class MainWindow : FluentWindow
     {
         EnsureProfilePopup();
         _profilePopupWindow!.ShowProfile(profile);
+        _profilePopupWindow.SetSwitchEnabled(_viewModel.CanOverlaySwitch);
         Hide();
         UpdateVisibleSurfaceRegistrations();
+    }
+
+    /// <summary>
+    /// 팝업이 열려 있으면 활성(또는 기본) 프로필과 전환 버튼 상태를 맞춘다.
+    /// </summary>
+    private void SyncProfilePopupSurface()
+    {
+        if (_profilePopupWindow is null ||
+            !_profilePopupWindow.IsVisible)
+        {
+            return;
+        }
+
+        var profile = _viewModel.DefaultPopupProfile;
+        if (profile is null)
+        {
+            HideProfilePopup();
+            return;
+        }
+
+        _profilePopupWindow.ShowProfile(profile);
+        _profilePopupWindow.SetSwitchEnabled(_viewModel.CanOverlaySwitch);
     }
 
     private void EnsureProfilePopup()
@@ -553,6 +618,7 @@ public partial class MainWindow : FluentWindow
         var popup = new ProfilePopupWindow(_popupPlacementStore);
         popup.ReturnRequested += ProfilePopupWindow_ReturnRequested;
         popup.MinimizeRequested += ProfilePopupWindow_MinimizeRequested;
+        popup.SwitchRequested += ProfilePopupWindow_SwitchRequested;
         popup.Closed += ProfilePopupWindow_Closed;
         _profilePopupWindow = popup;
     }

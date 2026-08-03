@@ -88,6 +88,73 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!--
+          화살표 14×14. 박스 안 여백 없이 그려서,
+          옆 16×16 아이콘과의 보이는 간격 = 버튼 Margin(3) 과 동일.
+        -->
+        <Style x:Key="OrangeSwitchArrowButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="MinWidth" Value="14" />
+            <Setter Property="MinHeight" Value="14" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border Background="Transparent"
+                                Width="14"
+                                Height="14"
+                                SnapsToDevicePixels="True">
+                            <Canvas Width="14" Height="14">
+                                <!--
+                                  CoralSquare 팔레트. 14×14 외곽 유지, 몸통만 조금 얇게.
+                                  위 화살표 두께 ~2.2 / 아래 ~2.2 (이전 ~3.4)
+                                -->
+                                <Path x:Name="arrowRight"
+                                      Fill="#FFFFD6CC"
+                                      Stroke="#FFFF8A6A"
+                                      StrokeThickness="1"
+                                      StrokeLineJoin="Round"
+                                      Data="M 0.5,3.4 L 8.0,3.4 L 8.0,2.2 L 13.5,4.5 L 8.0,6.8 L 8.0,5.6 L 0.5,5.6 Z" />
+                                <Path x:Name="arrowLeft"
+                                      Fill="#FFFFD6CC"
+                                      Stroke="#FFFF8A6A"
+                                      StrokeThickness="1"
+                                      StrokeLineJoin="Round"
+                                      Data="M 13.5,8.4 L 6.0,8.4 L 6.0,7.2 L 0.5,9.5 L 6.0,11.8 L 6.0,10.6 L 13.5,10.6 Z" />
+                            </Canvas>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="arrowRight" Property="Fill" Value="#FFFFB9A8" />
+                                <Setter TargetName="arrowRight" Property="Stroke" Value="#FFFF6F4A" />
+                                <Setter TargetName="arrowLeft" Property="Fill" Value="#FFFFB9A8" />
+                                <Setter TargetName="arrowLeft" Property="Stroke" Value="#FFFF6F4A" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="arrowRight" Property="Fill" Value="#FFFF967D" />
+                                <Setter TargetName="arrowRight" Property="Stroke" Value="#FFFF6F4A" />
+                                <Setter TargetName="arrowLeft" Property="Fill" Value="#FFFF967D" />
+                                <Setter TargetName="arrowLeft" Property="Stroke" Value="#FFFF6F4A" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="arrowRight" Property="Fill" Value="#FFFFEDE8" />
+                                <Setter TargetName="arrowRight" Property="Stroke" Value="#FFFFD6CC" />
+                                <Setter TargetName="arrowLeft" Property="Fill" Value="#FFFFEDE8" />
+                                <Setter TargetName="arrowLeft" Property="Stroke" Value="#FFFFD6CC" />
+                                <Setter Property="Opacity" Value="0.7" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="2,2,2,0">
@@ -133,10 +200,19 @@
                     <Button AutomationProperties.Name="팝업 최소화"
                             Click="MinimizeButton_Click"
                             Style="{StaticResource CoralSquareButtonStyle}" />
-                    <Button Margin="4,0,0,0"
+                    <Button Margin="3,0,0,0"
                             AutomationProperties.Name="메인 창으로 돌아가기"
                             Click="ReturnButton_Click"
                             Style="{StaticResource SkyCirclePopupButtonStyle}" />
+                    <!-- Margin 3 = 그려진 도형 간격(스카이 16 오른쪽 ↔ 화살표 14 왼쪽) -->
+                    <Button x:Name="SwitchButton"
+                            Margin="3,0,0,0"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="프로필 전환"
+                            Click="SwitchButton_Click"
+                            IsEnabled="False"
+                            Style="{StaticResource OrangeSwitchArrowButtonStyle}"
+                            ToolTip="다른 프로필로 전환" />
                 </StackPanel>
 
                 <Grid Grid.Row="0"

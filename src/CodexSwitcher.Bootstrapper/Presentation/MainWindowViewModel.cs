@@ -305,6 +305,18 @@ public sealed class MainWindowViewModel : ObservableObject
             (_, token) => RefreshRuntimeStateAfterChangeAsync(token),
             cancellationToken);
 
+    /// <summary>
+    /// 오버레이 전환 버튼의 대상 후보.
+    /// 메인 목록과 같이 전환 가능한(실행 중·비활성·조작 가능) 프로필만 포함한다.
+    /// </summary>
+    public IReadOnlyList<ProfileListItemViewModel> GetOverlaySwitchCandidates() =>
+        Profiles
+            .Where(profile => profile.IsSwitchAction && profile.IsRunEnabled)
+            .ToArray();
+
+    public bool CanOverlaySwitch =>
+        GetOverlaySwitchCandidates().Count > 0;
+
     public Task<DeleteProfileResult> DeleteProfileAsync(
         ProfileId profileId,
         CancellationToken cancellationToken) =>

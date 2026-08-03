@@ -196,6 +196,77 @@ public sealed class MainWindowViewModelTests
             fixture.ViewModel.ActiveProfile?.Id);
     }
 
+    [TestMethod]
+    public async Task GetOverlaySwitchCandidates_WhenStopped_ReturnsEmpty()
+    {
+        var fixture = new Fixture();
+        fixture.AddProfile("Personal", "personal"u8.ToArray());
+        await fixture.ViewModel.InitializeAsync(CancellationToken.None);
+
+        Assert.IsFalse(fixture.ViewModel.CanOverlaySwitch);
+        Assert.IsEmpty(fixture.ViewModel.GetOverlaySwitchCandidates());
+    }
+
+    [TestMethod]
+    public async Task GetOverlaySwitchCandidates_WhenSingleProfileRunning_ReturnsEmpty()
+    {
+        var fixture = new Fixture();
+        fixture.Codex.IsRunning = true;
+        fixture.Authentication.CurrentCredential =
+            fixture.TargetCredential.ToArray();
+        await fixture.ViewModel.InitializeAsync(CancellationToken.None);
+
+        Assert.IsFalse(fixture.ViewModel.CanOverlaySwitch);
+        Assert.IsEmpty(fixture.ViewModel.GetOverlaySwitchCandidates());
+    }
+
+    [TestMethod]
+    public async Task GetOverlaySwitchCandidates_WhenTwoProfilesRunning_ReturnsOtherProfile()
+    {
+        var fixture = new Fixture();
+        var personal = fixture.AddProfile(
+            "Personal",
+            "personal"u8.ToArray());
+        fixture.Codex.IsRunning = true;
+        fixture.Authentication.CurrentCredential =
+            fixture.TargetCredential.ToArray();
+        await fixture.ViewModel.InitializeAsync(CancellationToken.None);
+
+        var candidates = fixture.ViewModel.GetOverlaySwitchCandidates();
+
+        Assert.IsTrue(fixture.ViewModel.CanOverlaySwitch);
+        Assert.HasCount(1, candidates);
+        Assert.AreEqual(personal.Id, candidates[0].Id);
+    }
+
+    [TestMethod]
+    public async Task GetOverlaySwitchCandidates_WhenThreeProfilesRunning_ExcludesActive()
+    {
+        var fixture = new Fixture();
+        var personal = fixture.AddProfile(
+            "Personal",
+            "personal"u8.ToArray());
+        var work = fixture.AddProfile(
+            "Work",
+            "work"u8.ToArray());
+        fixture.Codex.IsRunning = true;
+        fixture.Authentication.CurrentCredential =
+            fixture.TargetCredential.ToArray();
+        await fixture.ViewModel.InitializeAsync(CancellationToken.None);
+
+        var candidates = fixture.ViewModel.GetOverlaySwitchCandidates();
+
+        Assert.IsTrue(fixture.ViewModel.CanOverlaySwitch);
+        Assert.HasCount(2, candidates);
+        Assert.DoesNotContain(
+            fixture.Profile.Id,
+            candidates.Select(candidate => candidate.Id));
+        Assert.IsTrue(
+            candidates.Any(candidate => candidate.Id == personal.Id));
+        Assert.IsTrue(
+            candidates.Any(candidate => candidate.Id == work.Id));
+    }
+
     private sealed class Fixture
     {
         public Fixture()

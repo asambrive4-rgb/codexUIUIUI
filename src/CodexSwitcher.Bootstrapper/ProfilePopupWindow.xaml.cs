@@ -24,6 +24,8 @@ public partial class ProfilePopupWindow : Window
 
     public event EventHandler? MinimizeRequested;
 
+    public event EventHandler? SwitchRequested;
+
     /// <summary>
     /// 같은 창 인스턴스를 재사용하며 프로필만 바인딩한다.
     /// </summary>
@@ -48,6 +50,50 @@ public partial class ProfilePopupWindow : Window
             _hasPlaced = true;
             RestoreAndActivate();
         }
+    }
+
+    public void SetSwitchEnabled(bool isEnabled)
+    {
+        SwitchButton.IsEnabled = isEnabled;
+    }
+
+    /// <summary>
+    /// 전환 대상이 여러 개일 때 버튼 옆에 선택 메뉴를 연다.
+    /// </summary>
+    public void OpenSwitchCandidateMenu(
+        IReadOnlyList<ProfileListItemViewModel> candidates,
+        Action<ProfileListItemViewModel> onSelected)
+    {
+        if (candidates.Count == 0)
+        {
+            return;
+        }
+
+        var menu = new ContextMenu
+        {
+            PlacementTarget = SwitchButton,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom
+        };
+
+        foreach (var candidate in candidates)
+        {
+            var item = new MenuItem
+            {
+                Header = candidate.Name,
+                Tag = candidate
+            };
+            item.Click += (_, _) =>
+            {
+                if (item.Tag is ProfileListItemViewModel selected)
+                {
+                    onSelected(selected);
+                }
+            };
+            menu.Items.Add(item);
+        }
+
+        SwitchButton.ContextMenu = menu;
+        menu.IsOpen = true;
     }
 
     public void HidePopup()
@@ -95,6 +141,11 @@ public partial class ProfilePopupWindow : Window
         object sender,
         RoutedEventArgs e) =>
         MinimizeRequested?.Invoke(this, EventArgs.Empty);
+
+    private void SwitchButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        SwitchRequested?.Invoke(this, EventArgs.Empty);
 
     private void PopupSurface_MouseLeftButtonDown(
         object sender,
